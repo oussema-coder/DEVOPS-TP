@@ -11,14 +11,14 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    // Use the fully qualified plugin goal instead of just 'sonar:sonar'
-                    sh 'mvn clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:3.10.0.2594:sonar -Dsonar.projectKey=DEVOPS-TP -Dsonar.projectName="DEVOPS-TP" -s settings.xml'
+                    sh 'mvn clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:3.10.0.2594:sonar -Dsonar.projectKey=DEVOPS-TP -Dsonar.projectName="DEVOPS-TP" -Dsonar.token=sqa_60ee6ca622b73f11bdd1ec0788cbb4a6feef45a1 -s settings.xml'
                 }
             }
         }
 
         stage('Build, Test and Deploy to Nexus') {
             steps {
+                // Uses settings.xml configured with Nexus credentials
                 sh 'mvn -B clean deploy -s settings.xml'
             }
         }
