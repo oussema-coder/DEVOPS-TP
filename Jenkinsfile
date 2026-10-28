@@ -3,12 +3,12 @@ pipeline {
     agent any
 
     stages {
-        stage('Build and Test') {
+        stage('Build, Test and Deploy to Nexus') {
             steps {
-                sh 'mvn -B clean verify'
+                // Uses settings.xml configured with Nexus credentials
+                sh 'mvn -B clean deploy -s settings.xml'
             }
-        }
-    }
+        }}
 
     post {
         success {
