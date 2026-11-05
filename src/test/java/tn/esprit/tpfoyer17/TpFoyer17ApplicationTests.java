@@ -9,7 +9,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tn.esprit.tpfoyer17.entities.Foyer;
 import tn.esprit.tpfoyer17.repositories.FoyerRepository;
-import tn.esprit.tpfoyer17.services.FoyerServiceImpl;
+import tn.esprit.tpfoyer17.services.FoyerService;
 
 import java.util.Arrays;
 import java.util.List;
@@ -22,13 +22,13 @@ class TpFoyer17ApplicationTests {
     private FoyerRepository foyerRepository;
 
     @InjectMocks
-    private FoyerServiceImpl foyerService;
+    private FoyerService foyerService;
 
     @Test
-    void testRetrieveAllFoyers() {
+    void testGetAllFoyers() {
         Foyer f = new Foyer();
         Mockito.when(foyerRepository.findAll()).thenReturn(Arrays.asList(f));
-        List<Foyer> list = foyerService.retrieveAllFoyers();
+        List<Foyer> list = foyerService.getAllFoyers();
         Assertions.assertEquals(1, list.size());
     }
 
@@ -49,17 +49,17 @@ class TpFoyer17ApplicationTests {
     }
 
     @Test
-    void testRetrieveFoyer() {
+    void testGetFoyerById() {
         Foyer f = new Foyer();
         Mockito.when(foyerRepository.findById(1L)).thenReturn(Optional.of(f));
-        Foyer found = foyerService.retrieveFoyer(1L);
+        Foyer found = foyerService.getFoyerById(1L);
         Assertions.assertNotNull(found);
     }
 
     @Test
-    void testRemoveFoyer() {
+    void testDeleteFoyer() {
         Mockito.doNothing().when(foyerRepository).deleteById(1L);
-        foyerService.removeFoyer(1L);
+        foyerService.deleteFoyer(1L);
         Mockito.verify(foyerRepository).deleteById(1L);
     }
 }
