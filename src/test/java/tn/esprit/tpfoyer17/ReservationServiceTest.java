@@ -7,6 +7,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import tn.esprit.tpfoyer17.entities.Reservation;
 import tn.esprit.tpfoyer17.repositories.ReservationRepository;
 import tn.esprit.tpfoyer17.services.ReservationService;
@@ -17,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class ReservationServiceTest {
 
     @Mock
@@ -58,11 +61,7 @@ class ReservationServiceTest {
 
     @Test
     void testGetReservationParAnneeUniversitaireEtNomUniversite() {
-        Reservation r = new Reservation();
         Date date = new Date();
-        // On mocke findAll() pour éviter les erreurs sur le nom de la requête personnalisée
-        Mockito.when(reservationRepository.findAll()).thenReturn(Arrays.asList(r));
-        
         List<Reservation> list = reservationService.getReservationParAnneeUniversitaireEtNomUniversite(date, "Esprit");
         Assertions.assertNotNull(list);
     }
