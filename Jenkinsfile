@@ -2,6 +2,10 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKER_IMAGE = 'YOUR_DOCKERHUB_USERNAME/devops-tp'
+    }
+
     stages {
 
         stage('Checkout') {
@@ -16,6 +20,26 @@ pipeline {
             }
         }
 
+        stage('JaCoCo Coverage') {
+            steps {
+                script {
+                    if (!fileExists('target/site/jacoco/jacoco.xml')) {
+                        error 'JaCoCo XML report not found!'
+                    }
+                }
+
+                archiveArtifacts(
+                    artifacts: 'target/site/jacoco/**',
+                    fingerprint: true
+                )
+
+                junit(
+                    testResults: '**/target/surefire-reports/*.xml',
+                    allowEmptyResults: true
+                )
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
@@ -26,12 +50,12 @@ pipeline {
                         )
                     ]) {
                         sh '''
-                           mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.5.0.6356:sonar \
-                           -Dsonar.projectKey=DEVOPS-TP \
-                           -Dsonar.projectName=DEVOPS-TP \
-                           -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-                           -Dsonar.token=$SONAR_TOKEN \
-                           -s settings.xml
+                            mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.5.0.6356:sonar \
+                            -Dsonar.projectKey=DEVOPS-TP \
+                            -Dsonar.projectName=DEVOPS-TP \
+                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                            -Dsonar.token=$SONAR_TOKEN \
+                            -s settings.xml
                         '''
                     }
                 }
@@ -47,21 +71,25 @@ pipeline {
                         passwordVariable: 'NEXUS_PASSWORD'
                     )
                 ]) {
-                    sh '''
-                        mvn -B deploy -s settings.xml
-                    '''
+                    sh 'mvn -B deploy -s settings.xml'
                 }
             }
         }
+ 
     }
 
     post {
         success {
-            echo 'Build, SonarQube analysis and Nexus deployment passed!'
+            echo 'CI/CD Pipeline completed successfully!'
+            echo 'Build, Tests, JaCoCo, SonarQube, Nexus and Docker passed!'
         }
 
         failure {
             echo 'Pipeline failed. Check Console Output.'
+        }
+
+        always {
+            echo 'Pipeline execution finished.'
         }
     }
 }
