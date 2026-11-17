@@ -40,6 +40,16 @@ pipeline {
             }
         }
 
+        stage('JaCoCo Report') {
+            steps {
+                jacoco(
+                    execPattern: '**/target/*.exec',
+                    classPattern: '**/target/classes',
+                    sourcePattern: '**/src/main/java'
+                )
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
@@ -75,13 +85,12 @@ pipeline {
                 }
             }
         }
- 
     }
 
     post {
         success {
             echo 'CI/CD Pipeline completed successfully!'
-            echo 'Build, Tests, JaCoCo, SonarQube, Nexus and Docker passed!'
+            echo 'Build, Tests, JaCoCo, SonarQube and Nexus passed!'
         }
 
         failure {
