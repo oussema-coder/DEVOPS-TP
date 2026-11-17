@@ -1,10 +1,10 @@
 
-FROM jenkins/jenkins:lts-jdk21
+FROM eclipse-temurin:17-jre
 
-USER root
+WORKDIR /app
 
-RUN apt-get update \
-    && apt-get install -y maven \
-    && rm -rf /var/lib/apt/lists/*
+COPY target/*.jar app.jar
 
-USER jenkins
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "app.jar"]

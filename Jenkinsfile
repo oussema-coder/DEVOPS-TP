@@ -26,11 +26,12 @@ pipeline {
                         )
                     ]) {
                         sh '''
-                            mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.5.0.6356:sonar \
-                            -Dsonar.projectKey=DEVOPS-TP \
-                            -Dsonar.projectName=DEVOPS-TP \
-                            -Dsonar.token=$SONAR_TOKEN \
-                            -s settings.xml
+                           mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.5.0.6356:sonar \
+                           -Dsonar.projectKey=DEVOPS-TP \
+                           -Dsonar.projectName=DEVOPS-TP \
+                           -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                           -Dsonar.token=$SONAR_TOKEN \
+                           -s settings.xml
                         '''
                     }
                 }
