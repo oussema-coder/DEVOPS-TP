@@ -1,35 +1,56 @@
+
 pipeline {
     agent any
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
+        stage('Build and Test') {
+            steps {
+                sh 'mvn -B clean verify -s settings.xml'
+            }
+        }
+
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh 'mvn clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:3.10.0.2594:sonar -Dsonar.projectKey=DEVOPS-TP -Dsonar.projectName="DEVOPS-TP" -Dsonar.token=sqa_60ee6ca622b73f11bdd1ec0788cbb4a6feef45a1 -s settings.xml'
+                    withCredentials([
+                        string(
+                            credentialsId: 'sonarqube-token',
+                            variable: 'SONAR_TOKEN'
+                        )
+                    ]) {
+                        sh '''
+                            mvn sonar:sonar \
+                            -Dsonar.projectKey=DEVOPS-TP \
+                            -Dsonar.projectName=DEVOPS-TP \
+                            -Dsonar.token=$SONAR_TOKEN \
+                            -s settings.xml
+                        '''
+                    }
                 }
             }
         }
 
-        stage('Build, Test and Deploy to Nexus') {
+        stage('Deploy to Nexus') {
             steps {
-                // Uses settings.xml configured with Nexus credentials
-                sh 'mvn -B clean deploy -s settings.xml'
+                sh 'mvn -B deploy -s settings.xml'
             }
         }
     }
 
     post {
         success {
-            echo 'Build, SonarQube analysis, and deployment passed!'
+            echo 'Build, SonarQube analysis and Nexus deployment passed!'
         }
+
         failure {
-            echo 'Build failed. Check Console Output.'
+            echo 'Pipeline failed. Check Console Output.'
         }
     }
 }
