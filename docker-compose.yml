@@ -1,0 +1,113 @@
+services:
+  sonar-db:
+    image: postgres:15-alpine
+    container_name: devops-sonar-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonarpassword
+      POSTGRES_DB: sonarqube
+    volumes:
+      - sonar_db_data:/var/lib/postgresql/data
+    networks:
+      - devops-network
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: devops-sonarqube
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      - SONAR_JDBC_USERNAME=sonar
+      - SONAR_JDBC_PASSWORD=sonarpassword
+      - SONAR_JDBC_URL=jdbc:postgresql://sonar-db:5432/sonarqube
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    networks:
+      - devops-network
+    depends_on:
+      - sonar-db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/system/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+  mysql:
+    image: mysql:8.0
+    container_name: devops-mysql
+    restart: unless-stopped
+    stop_grace_period: 1m
+    command:
+      - --innodb-buffer-pool-size=256M
+      - --innodb-flush-method=O_DIRECT
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-foyer}
+      MYSQL_USER: ${MYSQL_USER:-foyer_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - devops-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 300s
+
+  nexus:
+    image: sonatype/nexus3:latest
+    container_name: devops-nexus
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    volumes:
+      - nexus-data:/nexus-data
+    networks:
+      - devops-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/service/rest/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile.jenkins
+    container_name: devops-jenkins
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-foyer}
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-foyer_user}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+    volumes:
+      - jenkins_home:/var/jenkins_home
+    networks:
+      - devops-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      nexus:
+        condition: service_started
+
+networks:
+  devops-network:
+
+volumes:
+  jenkins_home:
+  mysql_data:
+  nexus-data:
+  sonar_db_data:    
+  sonarqube_data:    
+  sonarqube_extensions: 
+  sonarqube_logs:    
+
