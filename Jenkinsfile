@@ -26,7 +26,7 @@ pipeline {
                         )
                     ]) {
                         sh '''
-                            mvn sonar:sonar \
+                            mvn org.sonarsource.scanner.maven:sonar-maven-plugin:5.5.0.6356:sonar \
                             -Dsonar.projectKey=DEVOPS-TP \
                             -Dsonar.projectName=DEVOPS-TP \
                             -Dsonar.token=$SONAR_TOKEN \
