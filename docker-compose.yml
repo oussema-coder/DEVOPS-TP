@@ -77,20 +77,25 @@ services:
       retries: 5
       start_period: 60s
 
+  
+
   jenkins:
     build:
       context: .
-      dockerfile: Dockerfile.jenkins
+      dockerfile: dockerfile
     container_name: devops-jenkins
     restart: unless-stopped
     ports:
       - "8082:8080"
+    group_add:
+      - "0"
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-foyer}
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-foyer_user}
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
     volumes:
       - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - devops-network
     depends_on:
@@ -98,6 +103,7 @@ services:
         condition: service_healthy
       nexus:
         condition: service_started
+
 
 networks:
   devops-network:
