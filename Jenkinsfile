@@ -3,7 +3,7 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'YOUR_DOCKERHUB_USERNAME/devops-tp'
+        DOCKER_IMAGE = 'hamdiarij/devops-tp'
     }
 
     stages {
@@ -85,12 +85,45 @@ pipeline {
                 }
             }
         }
+
+        stage('Docker Build') {
+            steps {
+                sh '''
+                    docker build -t $DOCKER_IMAGE:$BUILD_NUMBER .
+                    docker tag $DOCKER_IMAGE:$BUILD_NUMBER $DOCKER_IMAGE:latest
+                '''
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        set -e
+
+                        echo "$DOCKER_PASSWORD" | docker login \
+                            -u "$DOCKER_USERNAME" --password-stdin
+
+                        docker push $DOCKER_IMAGE:$BUILD_NUMBER
+                        docker push $DOCKER_IMAGE:latest
+
+                        docker logout
+                    '''
+                }
+            }
+        }
     }
 
     post {
         success {
             echo 'CI/CD Pipeline completed successfully!'
-            echo 'Build, Tests, JaCoCo, SonarQube and Nexus passed!'
+            echo 'Build, Tests, JaCoCo, SonarQube, Nexus and Docker passed!'
         }
 
         failure {
