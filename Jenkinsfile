@@ -248,7 +248,63 @@ pipeline {
         }
 
         // ==========================================
-        // 10. TERRAFORM INIT
+        // 10. TEST KUBERNETES CONNECTION
+        // ==========================================
+        stage('Test Kubernetes Connection') {
+            steps {
+                echo '========== KUBERNETES CONNECTION TEST =========='
+
+                withCredentials([
+                    file(
+                        credentialsId: 'kubeid',
+                        variable: 'KUBECONFIG'
+                    ),
+                    string(
+                        credentialsId: 'aws_access_key_id',
+                        variable: 'AWS_ACCESS_KEY_ID'
+                    ),
+                    string(
+                        credentialsId: 'aws_secret_access_key',
+                        variable: 'AWS_SECRET_ACCESS_KEY'
+                    ),
+                    string(
+                        credentialsId: 'aws_session_token',
+                        variable: 'AWS_SESSION_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        set -e
+
+                        echo "[1] Checking kubectl..."
+
+                        if ! command -v kubectl >/dev/null 2>&1; then
+                            echo "ERROR: kubectl is not installed!"
+                            exit 1
+                        fi
+
+                        kubectl version --client
+
+                        echo "[2] Checking Kubernetes context..."
+
+                        kubectl config current-context
+
+                        echo "[3] Checking cluster connection..."
+
+                        kubectl cluster-info
+
+                        echo "[4] Checking Kubernetes nodes..."
+
+                        kubectl get nodes -o wide
+
+                        echo "[5] Kubernetes connection successful!"
+                    '''
+                }
+            }
+        }
+
+        // ==========================================
+        // 11. TERRAFORM INIT
         // ==========================================
         stage('Terraform Init') {
             steps {
@@ -285,7 +341,7 @@ pipeline {
         }
 
         // ==========================================
-        // 11. TERRAFORM VALIDATE
+        // 12. TERRAFORM VALIDATE
         // ==========================================
         stage('Terraform Validate') {
             steps {
@@ -304,7 +360,7 @@ pipeline {
         }
 
         // ==========================================
-        // 12. TERRAFORM PLAN
+        // 13. TERRAFORM PLAN
         // ==========================================
         stage('Terraform Plan') {
             steps {
@@ -341,7 +397,7 @@ pipeline {
         }
 
         // ==========================================
-        // 13. TERRAFORM APPLY
+        // 14. TERRAFORM APPLY
         // ==========================================
         stage('Terraform Apply') {
             steps {
@@ -377,64 +433,6 @@ pipeline {
                 }
             }
         }
-
-        // ==========================================
-        // 14. TEST KUBERNETES CONNECTION
-        // ==========================================
-        stage('Test Kubernetes Connection') {
-            steps {
-                echo '========== KUBERNETES CONNECTION TEST =========='
-
-                withCredentials([
-                    file(
-                        credentialsId: 'kubeid',
-                        variable: 'KUBECONFIG'
-                    ),
-                    string(
-                        credentialsId: 'aws_access_key_id',
-                        variable: 'AWS_ACCESS_KEY_ID'
-                    ),
-                    string(
-                        credentialsId: 'aws_secret_access_key',
-                        variable: 'AWS_SECRET_ACCESS_KEY'
-                    ),
-                    string(
-                        credentialsId: 'aws_session_token',
-                        variable: 'AWS_SESSION_TOKEN'
-                    )
-                ]) {
-                    sh '''
-                        set +x
-                        set -e
-
-                        export KUBECONFIG="$KUBECONFIG"
-
-                        echo "[1] Checking kubectl..."
-
-                        if ! command -v kubectl >/dev/null 2>&1; then
-                            echo "ERROR: kubectl is not installed!"
-                            exit 1
-                        fi
-
-                        kubectl version --client
-
-                        echo "[2] Checking Kubernetes context..."
-
-                        kubectl config current-context
-
-                        echo "[3] Checking cluster connection..."
-
-                        kubectl cluster-info
-
-                        echo "[4] Checking Kubernetes nodes..."
-
-                        kubectl get nodes -o wide
-
-                        echo "[5] Kubernetes connection successful!"
-                    '''
-                }
-            }
-        }
     }
 
     // ==========================================
@@ -448,18 +446,18 @@ pipeline {
             CI/CD PIPELINE COMPLETED SUCCESSFULLY!
             ==========================================
 
-            Build and Tests       : SUCCESS
-            JaCoCo Coverage       : SUCCESS
-            SonarQube             : SUCCESS
-            Nexus Deployment      : SUCCESS
-            Docker Build          : SUCCESS
-            Docker Push           : SUCCESS
-            AWS Connection        : SUCCESS
-            Terraform Init        : SUCCESS
-            Terraform Validate    : SUCCESS
-            Terraform Plan        : SUCCESS
-            Terraform Apply       : SUCCESS
-            Kubernetes Connection: SUCCESS
+            Build and Tests        : SUCCESS
+            JaCoCo Coverage        : SUCCESS
+            SonarQube              : SUCCESS
+            Nexus Deployment       : SUCCESS
+            Docker Build           : SUCCESS
+            Docker Push            : SUCCESS
+            AWS Connection         : SUCCESS
+            Kubernetes Connection  : SUCCESS
+            Terraform Init         : SUCCESS
+            Terraform Validate     : SUCCESS
+            Terraform Plan         : SUCCESS
+            Terraform Apply        : SUCCESS
 
             ==========================================
             ALL STAGES COMPLETED SUCCESSFULLY!
