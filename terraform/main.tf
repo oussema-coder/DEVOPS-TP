@@ -49,7 +49,7 @@ resource "aws_eks_node_group" "achat_nodes" {
   node_role_arn   = data.aws_iam_role.lab_role.arn
   subnet_ids      = data.aws_subnets.eks_subnets.ids
 
-  ami_type       = "AL2_x86_64"
+  ami_type       = "AL2023_x86_64_STANDARD"
   instance_types = ["t3.medium"]
 
   scaling_config {
