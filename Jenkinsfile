@@ -130,36 +130,66 @@ pipeline {
             }
         }
 
-        stage('Test AWS Connection') {
-            steps {
-                withCredentials([
-                    string(
-                        credentialsId: 'aws-access-key-id',
-                        variable: 'AWS_ACCESS_KEY_ID'
-                    ),
-                    string(
-                        credentialsId: 'aws-secret-access-key',
-                        variable: 'AWS_SECRET_ACCESS_KEY'
-                    ),
-                    string(
-                        credentialsId: 'aws-session-token',
-                        variable: 'AWS_SESSION_TOKEN'
-                    )
-                ]) {
-                    sh '''
-                        set +x
+       stage('Test AWS Connection') {
+    steps {
+        echo '========== AWS CONNECTION TEST =========='
 
-                        export AWS_DEFAULT_REGION=us-west-2
+        withCredentials([
+            string(
+                credentialsId: 'aws-access-key-id',
+                variable: 'AWS_ACCESS_KEY_ID'
+            ),
+            string(
+                credentialsId: 'aws-secret-access-key',
+                variable: 'AWS_SECRET_ACCESS_KEY'
+            ),
+            string(
+                credentialsId: 'aws-session-token',
+                variable: 'AWS_SESSION_TOKEN'
+            )
+        ]) {
+            withEnv(['AWS_DEFAULT_REGION=us-west-2']) {
+                sh '''
+                    set +x
 
-                        echo "Checking AWS CLI..."
-                        aws --version
+                    echo "[1] Checking AWS CLI..."
 
-                        echo "Testing AWS authentication..."
-                        aws sts get-caller-identity
-                    '''
-                }
+                    if ! command -v aws >/dev/null 2>&1; then
+                        echo "ERROR: AWS CLI is not installed!"
+                        exit 1
+                    fi
+
+                    aws --version
+
+                    echo "[2] Checking Jenkins credentials..."
+
+                    test -n "$AWS_ACCESS_KEY_ID" || {
+                        echo "ERROR: Access key is empty!"
+                        exit 1
+                    }
+
+                    test -n "$AWS_SECRET_ACCESS_KEY" || {
+                        echo "ERROR: Secret key is empty!"
+                        exit 1
+                    }
+
+                    test -n "$AWS_SESSION_TOKEN" || {
+                        echo "ERROR: Session token is empty!"
+                        exit 1
+                    }
+
+                    echo "All three Jenkins credentials are loaded."
+
+                    echo "[3] Testing AWS authentication..."
+
+                    aws sts get-caller-identity
+
+                    echo "[4] AWS connection successful!"
+                '''
             }
         }
+    }
+}
     }
 
     post {
