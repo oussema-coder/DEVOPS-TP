@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -130,66 +131,66 @@ pipeline {
             }
         }
 
-       stage('Test AWS Connection') {
-    steps {
-        echo '========== AWS CONNECTION TEST =========='
+        stage('Test AWS Connection') {
+            steps {
+                echo '========== AWS CONNECTION TEST =========='
 
-        withCredentials([
-            string(
-                credentialsId: 'aws-access-key-id',
-                variable: 'AWS_ACCESS_KEY_ID'
-            ),
-            string(
-                credentialsId: 'aws-secret-access-key',
-                variable: 'AWS_SECRET_ACCESS_KEY'
-            ),
-            string(
-                credentialsId: 'aws-session-token',
-                variable: 'AWS_SESSION_TOKEN'
-            )
-        ]) {
-            withEnv(['AWS_DEFAULT_REGION=us-west-2']) {
-                sh '''
-                    set +x
+                withCredentials([
+                    string(
+                        credentialsId: 'aws_access_key_id',
+                        variable: 'AWS_ACCESS_KEY_ID'
+                    ),
+                    string(
+                        credentialsId: 'aws_secret_access_key',
+                        variable: 'AWS_SECRET_ACCESS_KEY'
+                    ),
+                    string(
+                        credentialsId: 'aws_session_token',
+                        variable: 'AWS_SESSION_TOKEN'
+                    )
+                ]) {
+                    withEnv(['AWS_DEFAULT_REGION=us-west-2']) {
+                        sh '''
+                            set +x
 
-                    echo "[1] Checking AWS CLI..."
+                            echo "[1] Checking AWS CLI..."
 
-                    if ! command -v aws >/dev/null 2>&1; then
-                        echo "ERROR: AWS CLI is not installed!"
-                        exit 1
-                    fi
+                            if ! command -v aws >/dev/null 2>&1; then
+                                echo "ERROR: AWS CLI is not installed!"
+                                exit 1
+                            fi
 
-                    aws --version
+                            aws --version
 
-                    echo "[2] Checking Jenkins credentials..."
+                            echo "[2] Checking credentials..."
 
-                    test -n "$AWS_ACCESS_KEY_ID" || {
-                        echo "ERROR: Access key is empty!"
-                        exit 1
+                            test -n "$AWS_ACCESS_KEY_ID" || {
+                                echo "ERROR: Access key is empty!"
+                                exit 1
+                            }
+
+                            test -n "$AWS_SECRET_ACCESS_KEY" || {
+                                echo "ERROR: Secret key is empty!"
+                                exit 1
+                            }
+
+                            test -n "$AWS_SESSION_TOKEN" || {
+                                echo "ERROR: Session token is empty!"
+                                exit 1
+                            }
+
+                            echo "Jenkins credentials loaded successfully."
+
+                            echo "[3] Testing AWS authentication..."
+
+                            aws sts get-caller-identity
+
+                            echo "[4] AWS connection successful!"
+                        '''
                     }
-
-                    test -n "$AWS_SECRET_ACCESS_KEY" || {
-                        echo "ERROR: Secret key is empty!"
-                        exit 1
-                    }
-
-                    test -n "$AWS_SESSION_TOKEN" || {
-                        echo "ERROR: Session token is empty!"
-                        exit 1
-                    }
-
-                    echo "All three Jenkins credentials are loaded."
-
-                    echo "[3] Testing AWS authentication..."
-
-                    aws sts get-caller-identity
-
-                    echo "[4] AWS connection successful!"
-                '''
+                }
             }
         }
-    }
-}
     }
 
     post {
