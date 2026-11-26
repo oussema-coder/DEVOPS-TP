@@ -4,6 +4,7 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'hamdiarij/devops-tp'
+        AWS_DEFAULT_REGION = 'us-west-2'
     }
 
     stages {
@@ -149,45 +150,71 @@ pipeline {
                         variable: 'AWS_SESSION_TOKEN'
                     )
                 ]) {
-                    withEnv(['AWS_DEFAULT_REGION=us-west-2']) {
-                        sh '''
-                            set +x
+                    sh '''
+                        set +x
 
-                            echo "[1] Checking AWS CLI..."
+                        echo "[1] Checking AWS CLI..."
 
-                            if ! command -v aws >/dev/null 2>&1; then
-                                echo "ERROR: AWS CLI is not installed!"
-                                exit 1
-                            fi
+                        if ! command -v aws >/dev/null 2>&1; then
+                            echo "ERROR: AWS CLI is not installed!"
+                            exit 1
+                        fi
 
-                            aws --version
+                        aws --version
 
-                            echo "[2] Checking credentials..."
+                        echo "[2] Checking credentials..."
 
-                            test -n "$AWS_ACCESS_KEY_ID" || {
-                                echo "ERROR: Access key is empty!"
-                                exit 1
-                            }
+                        test -n "$AWS_ACCESS_KEY_ID" || {
+                            echo "ERROR: Access key is empty!"
+                            exit 1
+                        }
 
-                            test -n "$AWS_SECRET_ACCESS_KEY" || {
-                                echo "ERROR: Secret key is empty!"
-                                exit 1
-                            }
+                        test -n "$AWS_SECRET_ACCESS_KEY" || {
+                            echo "ERROR: Secret key is empty!"
+                            exit 1
+                        }
 
-                            test -n "$AWS_SESSION_TOKEN" || {
-                                echo "ERROR: Session token is empty!"
-                                exit 1
-                            }
+                        test -n "$AWS_SESSION_TOKEN" || {
+                            echo "ERROR: Session token is empty!"
+                            exit 1
+                        }
 
-                            echo "Jenkins credentials loaded successfully."
+                        echo "Jenkins credentials loaded successfully."
 
-                            echo "[3] Testing AWS authentication..."
+                        echo "[3] Testing AWS authentication..."
 
-                            aws sts get-caller-identity
+                        aws sts get-caller-identity
 
-                            echo "[4] AWS connection successful!"
-                        '''
-                    }
+                        echo "[4] AWS connection successful!"
+                    '''
+                }
+            }
+        }
+
+        stage('Check EKS Cluster') {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: 'aws_access_key_id',
+                        variable: 'AWS_ACCESS_KEY_ID'
+                    ),
+                    string(
+                        credentialsId: 'aws_secret_access_key',
+                        variable: 'AWS_SECRET_ACCESS_KEY'
+                    ),
+                    string(
+                        credentialsId: 'aws_session_token',
+                        variable: 'AWS_SESSION_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+
+                        echo "Checking AWS EKS clusters..."
+
+                        aws eks list-clusters \
+                            --region "$AWS_DEFAULT_REGION"
+                    '''
                 }
             }
         }
@@ -196,7 +223,7 @@ pipeline {
     post {
         success {
             echo 'CI/CD Pipeline completed successfully!'
-            echo 'Build, Tests, JaCoCo, SonarQube, Nexus, Docker and AWS passed!'
+            echo 'Build, Tests, JaCoCo, SonarQube, Nexus, Docker, AWS and EKS checks passed!'
         }
 
         failure {
