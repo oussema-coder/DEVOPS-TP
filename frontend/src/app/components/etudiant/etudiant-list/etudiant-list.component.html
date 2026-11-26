@@ -1,0 +1,82 @@
+<div class="page-header">
+  <h1><span class="icon">👤</span> Étudiants</h1>
+  <button id="btn-add-etudiant" class="btn btn-primary" (click)="openAdd()">+ Ajouter</button>
+</div>
+
+<div *ngIf="success" class="alert alert-success">{{ success }}</div>
+<div *ngIf="error"   class="alert alert-error">{{ error }}</div>
+<div *ngIf="loading" class="spinner-wrap"><div class="spinner"></div></div>
+
+<ng-container *ngIf="!loading">
+  <div *ngIf="items.length === 0" class="empty-state">
+    <div class="empty-icon">👤</div>
+    <p>Aucun étudiant trouvé.</p>
+    <button class="btn btn-primary mt-2" (click)="openAdd()">Ajouter le premier</button>
+  </div>
+
+  <div *ngIf="items.length > 0" class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nom</th>
+          <th>Prénom</th>
+          <th>CIN</th>
+          <th>Date de naissance</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let e of items">
+          <td><span class="badge badge-teal">#{{ e.idEtudiant }}</span></td>
+          <td><strong>{{ e.nomEtudiant }}</strong></td>
+          <td>{{ e.prenomEtudiant }}</td>
+          <td><code>{{ e.cinEtudiant }}</code></td>
+          <td>{{ formatDate(e.dateNaissance) }}</td>
+          <td class="actions-cell">
+            <button class="btn btn-sm btn-secondary" (click)="openEdit(e)">✏️ Modifier</button>
+            <button class="btn btn-sm btn-danger"    (click)="delete(e.idEtudiant!)">🗑️ Supprimer</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</ng-container>
+
+<div class="modal-overlay" *ngIf="showModal" (click)="close()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>{{ editMode ? 'Modifier' : 'Ajouter' }} un Étudiant</h2>
+      <button class="btn-icon" (click)="close()">✕</button>
+    </div>
+    <form (ngSubmit)="save()">
+      <div class="form-group">
+        <label for="nomEtudiant">Nom</label>
+        <input id="nomEtudiant" class="form-control" type="text"
+               [(ngModel)]="current.nomEtudiant" name="nomEtudiant"
+               placeholder="ex: Ben Ali" required>
+      </div>
+      <div class="form-group">
+        <label for="prenomEtudiant">Prénom</label>
+        <input id="prenomEtudiant" class="form-control" type="text"
+               [(ngModel)]="current.prenomEtudiant" name="prenomEtudiant"
+               placeholder="ex: Ahmed" required>
+      </div>
+      <div class="form-group">
+        <label for="cinEtudiant">CIN</label>
+        <input id="cinEtudiant" class="form-control" type="number"
+               [(ngModel)]="current.cinEtudiant" name="cinEtudiant"
+               placeholder="ex: 12345678" required>
+      </div>
+      <div class="form-group">
+        <label for="dateNaissance">Date de naissance</label>
+        <input id="dateNaissance" class="form-control" type="date"
+               [(ngModel)]="current.dateNaissance" name="dateNaissance" required>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" (click)="close()">Annuler</button>
+        <button type="submit" class="btn btn-primary">{{ editMode ? 'Mettre à jour' : 'Ajouter' }}</button>
+      </div>
+    </form>
+  </div>
+</div>

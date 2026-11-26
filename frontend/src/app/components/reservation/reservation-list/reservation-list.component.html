@@ -1,0 +1,108 @@
+<div class="page-header">
+  <h1><span class="icon">📋</span> Réservations</h1>
+  <div class="header-actions">
+    <button id="btn-annuler-reservation" class="btn btn-secondary" (click)="openCancel()">❌ Annuler</button>
+    <button id="btn-new-reservation"     class="btn btn-primary"   (click)="openNew()">+ Nouvelle Réservation</button>
+  </div>
+</div>
+
+<div *ngIf="success" class="alert alert-success">{{ success }}</div>
+<div *ngIf="error"   class="alert alert-error">{{ error }}</div>
+<div *ngIf="loading" class="spinner-wrap"><div class="spinner"></div></div>
+
+<ng-container *ngIf="!loading">
+  <div *ngIf="items.length === 0" class="empty-state">
+    <div class="empty-icon">📋</div>
+    <p>Aucune réservation trouvée.</p>
+    <button class="btn btn-primary mt-2" (click)="openNew()">Créer la première</button>
+  </div>
+
+  <div *ngIf="items.length > 0" class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Année</th>
+          <th>Statut</th>
+          <th>Étudiants</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of items">
+          <td><code class="res-id">{{ r.idReservation }}</code></td>
+          <td>{{ formatDate(r.anneeUniversitaire) }}</td>
+          <td>
+            <span class="badge" [ngClass]="r.estValide ? 'badge-success' : 'badge-warning'">
+              {{ r.estValide ? '✓ Valide' : '⏳ En attente' }}
+            </span>
+          </td>
+          <td>{{ r.etudiants?.length ?? 0 }} étudiant(s)</td>
+          <td class="actions-cell">
+            <button class="btn btn-sm btn-danger" (click)="delete(r.idReservation!)">🗑️ Supprimer</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</ng-container>
+
+<!-- New Reservation Modal -->
+<div class="modal-overlay" *ngIf="showNewModal" (click)="closeNew()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Nouvelle Réservation</h2>
+      <button class="btn-icon" (click)="closeNew()">✕</button>
+    </div>
+    <form (ngSubmit)="submitNew()">
+      <div class="form-group">
+        <label for="selectBloc">Bloc</label>
+        <select id="selectBloc" class="form-control"
+                [(ngModel)]="newIdBloc" name="newIdBloc" required>
+          <option value="0" disabled>-- Choisir un bloc --</option>
+          <option *ngFor="let b of blocs" [value]="b.idBloc">{{ b.nomBloc }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="selectEtudiant">Étudiant (CIN)</label>
+        <select id="selectEtudiant" class="form-control"
+                [(ngModel)]="newCinEtudiant" name="newCinEtudiant" required>
+          <option value="0" disabled>-- Choisir un étudiant --</option>
+          <option *ngFor="let e of etudiants" [value]="e.cinEtudiant">
+            {{ e.nomEtudiant }} {{ e.prenomEtudiant }} ({{ e.cinEtudiant }})
+          </option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" (click)="closeNew()">Annuler</button>
+        <button type="submit" class="btn btn-primary">Créer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Cancel Reservation Modal -->
+<div class="modal-overlay" *ngIf="showCancelModal" (click)="closeCancel()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>Annuler une Réservation</h2>
+      <button class="btn-icon" (click)="closeCancel()">✕</button>
+    </div>
+    <form (ngSubmit)="submitCancel()">
+      <div class="form-group">
+        <label for="cancelCinEtudiant">CIN de l'étudiant</label>
+        <select id="cancelCinEtudiant" class="form-control"
+                [(ngModel)]="cancelCin" name="cancelCin" required>
+          <option value="0" disabled>-- Choisir un étudiant --</option>
+          <option *ngFor="let e of etudiants" [value]="e.cinEtudiant">
+            {{ e.nomEtudiant }} {{ e.prenomEtudiant }} ({{ e.cinEtudiant }})
+          </option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" (click)="closeCancel()">Fermer</button>
+        <button type="submit" class="btn btn-danger">Annuler la réservation</button>
+      </div>
+    </form>
+  </div>
+</div>

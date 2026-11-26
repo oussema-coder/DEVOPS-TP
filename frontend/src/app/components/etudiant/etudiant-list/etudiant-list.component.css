@@ -1,0 +1,2 @@
+.actions-cell { display: flex; gap: .5rem; align-items: center; }
+code { font-size: .82rem; color: var(--accent); background: var(--accent-glow); padding: .1rem .4rem; border-radius: 4px; }

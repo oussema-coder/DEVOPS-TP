@@ -1,0 +1,67 @@
+<div class="page-header">
+  <h1><span class="icon">🏢</span> Foyers</h1>
+  <button id="btn-add-foyer" class="btn btn-primary" (click)="openAdd()">+ Ajouter</button>
+</div>
+
+<div *ngIf="success" class="alert alert-success">{{ success }}</div>
+<div *ngIf="error"   class="alert alert-error">{{ error }}</div>
+<div *ngIf="loading" class="spinner-wrap"><div class="spinner"></div></div>
+
+<ng-container *ngIf="!loading">
+  <div *ngIf="items.length === 0" class="empty-state">
+    <div class="empty-icon">🏢</div>
+    <p>Aucun foyer trouvé.</p>
+    <button class="btn btn-primary mt-2" (click)="openAdd()">Ajouter le premier</button>
+  </div>
+
+  <div *ngIf="items.length > 0" class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nom</th>
+          <th>Capacité</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let f of items">
+          <td><span class="badge badge-teal">#{{ f.idFoyer }}</span></td>
+          <td><strong>{{ f.nomFoyer }}</strong></td>
+          <td>{{ f.capaciteFoyer }} places</td>
+          <td class="actions-cell">
+            <button class="btn btn-sm btn-secondary" (click)="openEdit(f)">✏️ Modifier</button>
+            <button class="btn btn-sm btn-danger"    (click)="delete(f.idFoyer!)">🗑️ Supprimer</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</ng-container>
+
+<div class="modal-overlay" *ngIf="showModal" (click)="close()">
+  <div class="modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>{{ editMode ? 'Modifier' : 'Ajouter' }} un Foyer</h2>
+      <button class="btn-icon" (click)="close()">✕</button>
+    </div>
+    <form (ngSubmit)="save()">
+      <div class="form-group">
+        <label for="nomFoyer">Nom du foyer</label>
+        <input id="nomFoyer" class="form-control" type="text"
+               [(ngModel)]="current.nomFoyer" name="nomFoyer"
+               placeholder="ex: Foyer A" required>
+      </div>
+      <div class="form-group">
+        <label for="capaciteFoyer">Capacité</label>
+        <input id="capaciteFoyer" class="form-control" type="number"
+               [(ngModel)]="current.capaciteFoyer" name="capaciteFoyer"
+               placeholder="ex: 200" min="1" required>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" (click)="close()">Annuler</button>
+        <button type="submit" class="btn btn-primary">{{ editMode ? 'Mettre à jour' : 'Ajouter' }}</button>
+      </div>
+    </form>
+  </div>
+</div>

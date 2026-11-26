@@ -3,9 +3,11 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'hamdiarij/devops-tp'
-        AWS_DEFAULT_REGION = 'us-east-1'
-        TERRAFORM_DIR = 'terraform'
+        DOCKER_IMAGE          = 'hamdiarij/devops-tp'
+        DOCKER_IMAGE_FRONTEND = 'hamdiarij/devops-tp-frontend'
+        AWS_DEFAULT_REGION    = 'us-east-1'
+        TERRAFORM_DIR         = 'terraform'
+        FRONTEND_DIR          = 'frontend'
     }
 
     stages {
@@ -183,7 +185,75 @@ pipeline {
                 }
             }
         }
-        
+
+        // ==========================================
+        // 8b. BUILD FRONTEND (Angular 16)
+        // ==========================================
+        stage('Build Frontend') {
+            steps {
+                dir("${FRONTEND_DIR}") {
+                    sh '''
+                        set -e
+                        echo "Installing frontend dependencies..."
+                        npm ci --legacy-peer-deps
+                        echo "Building Angular production bundle..."
+                        npm run build:prod
+                        echo "Frontend build completed!"
+                    '''
+                }
+            }
+        }
+
+        // ==========================================
+        // 8c. DOCKER BUILD FRONTEND
+        // ==========================================
+        stage('Docker Build Frontend') {
+            steps {
+                dir("${FRONTEND_DIR}") {
+                    sh '''
+                        set -e
+                        echo "Building frontend Docker image..."
+                        docker build \
+                            -t "$DOCKER_IMAGE_FRONTEND:$BUILD_NUMBER" .
+                        docker tag \
+                            "$DOCKER_IMAGE_FRONTEND:$BUILD_NUMBER" \
+                            "$DOCKER_IMAGE_FRONTEND:latest"
+                        echo "Frontend Docker image built successfully!"
+                    '''
+                }
+            }
+        }
+
+        // ==========================================
+        // 8d. DOCKER PUSH FRONTEND
+        // ==========================================
+        stage('Docker Push Frontend') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        set -e
+
+                        trap 'docker logout >/dev/null 2>&1 || true' EXIT
+
+                        echo "$DOCKER_PASSWORD" | docker login \
+                            -u "$DOCKER_USERNAME" \
+                            --password-stdin
+
+                        docker push "$DOCKER_IMAGE_FRONTEND:$BUILD_NUMBER"
+                        docker push "$DOCKER_IMAGE_FRONTEND:latest"
+
+                        echo "Frontend Docker images pushed successfully!"
+                    '''
+                }
+            }
+        }
 
         // ==========================================
         // 9. SETUP TERRAFORM
@@ -255,15 +325,19 @@ pipeline {
 
                         kubectl apply -f k8s/deployment.yaml
 
+                        # Rollout backend
                         kubectl rollout restart deployment/achat-app
-
                         kubectl rollout status deployment/achat-app --timeout=180s
+
+                        # Rollout frontend
+                        kubectl rollout restart deployment/foyer-frontend
+                        kubectl rollout status deployment/foyer-frontend --timeout=180s
 
                         echo "Kubernetes Pods:"
                         kubectl get pods
 
-                        echo "Kubernetes Service:"
-                        kubectl get svc achat-service
+                        echo "Kubernetes Services:"
+                        kubectl get svc achat-service foyer-frontend-service
                     '''
                 }
             }
@@ -286,14 +360,17 @@ pipeline {
             JaCoCo Report            : SUCCESS
             SonarQube Analysis       : SUCCESS
             Nexus Deployment         : SUCCESS
-            Docker Build             : SUCCESS
+            Docker Build (Backend)   : SUCCESS
+            Docker Push (Backend)    : SUCCESS
+            Build Frontend (Angular) : SUCCESS
+            Docker Build Frontend    : SUCCESS
             Terraform Init           : SUCCESS
             Terraform Validate       : SUCCESS
             Terraform Apply          : SUCCESS
             AWS EKS Configuration    : SUCCESS
             Kubernetes Deployment    : SUCCESS
 
-            Docker Push              : DISABLED
+            Docker Push Frontend     : SUCCESS
 
             ==========================================
             ALL ENABLED STAGES COMPLETED!
