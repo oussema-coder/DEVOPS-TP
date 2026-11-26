@@ -248,7 +248,48 @@ pipeline {
         }
 
         // ==========================================
-        // 10. TEST KUBERNETES CONNECTION
+        // 10. CHECK EKS ENDPOINT
+        // ==========================================
+        stage('Check EKS Endpoint') {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: 'aws_access_key_id',
+                        variable: 'AWS_ACCESS_KEY_ID'
+                    ),
+                    string(
+                        credentialsId: 'aws_secret_access_key',
+                        variable: 'AWS_SECRET_ACCESS_KEY'
+                    ),
+                    string(
+                        credentialsId: 'aws_session_token',
+                        variable: 'AWS_SESSION_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        set -e
+
+                        export AWS_DEFAULT_REGION=us-east-1
+
+                        echo "Checking AWS identity..."
+
+                        aws sts get-caller-identity
+
+                        echo "Checking EKS cluster..."
+
+                        aws eks describe-cluster \
+                            --name mykubernetes \
+                            --region us-east-1 \
+                            --query 'cluster.endpoint' \
+                            --output text
+                    '''
+                }
+            }
+        }
+
+        // ==========================================
+        // 11. TEST KUBERNETES CONNECTION
         // ==========================================
         stage('Test Kubernetes Connection') {
             steps {
@@ -304,7 +345,7 @@ pipeline {
         }
 
         // ==========================================
-        // 11. TERRAFORM INIT
+        // 12. TERRAFORM INIT
         // ==========================================
         stage('Terraform Init') {
             steps {
@@ -341,7 +382,7 @@ pipeline {
         }
 
         // ==========================================
-        // 12. TERRAFORM VALIDATE
+        // 13. TERRAFORM VALIDATE
         // ==========================================
         stage('Terraform Validate') {
             steps {
@@ -360,7 +401,7 @@ pipeline {
         }
 
         // ==========================================
-        // 13. TERRAFORM PLAN
+        // 14. TERRAFORM PLAN
         // ==========================================
         stage('Terraform Plan') {
             steps {
@@ -397,7 +438,7 @@ pipeline {
         }
 
         // ==========================================
-        // 14. TERRAFORM APPLY
+        // 15. TERRAFORM APPLY
         // ==========================================
         stage('Terraform Apply') {
             steps {
@@ -453,6 +494,7 @@ pipeline {
             Docker Build           : SUCCESS
             Docker Push            : SUCCESS
             AWS Connection         : SUCCESS
+            EKS Endpoint Check     : SUCCESS
             Kubernetes Connection  : SUCCESS
             Terraform Init         : SUCCESS
             Terraform Validate     : SUCCESS
