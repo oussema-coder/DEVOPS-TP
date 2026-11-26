@@ -49,13 +49,30 @@ resource "aws_eks_node_group" "achat_nodes" {
   node_role_arn   = data.aws_iam_role.lab_role.arn
   subnet_ids      = data.aws_subnets.eks_subnets.ids
 
+  ami_type       = "AL2_x86_64"
+  instance_types = ["t3.medium"]
+
   scaling_config {
     desired_size = 2
-    max_size     = 2
+    max_size     = 3
     min_size     = 1
   }
 
-  instance_types = ["t3.medium"]
-
   depends_on = [aws_eks_cluster.achat_cluster]
+}
+
+# 3. Outputs — required for `aws eks update-kubeconfig` in Jenkins
+output "cluster_name" {
+  description = "EKS Cluster name (used in Jenkinsfile update-kubeconfig step)"
+  value       = aws_eks_cluster.achat_cluster.name
+}
+
+output "cluster_endpoint" {
+  description = "EKS Cluster API server endpoint"
+  value       = aws_eks_cluster.achat_cluster.endpoint
+}
+
+output "cluster_region" {
+  description = "AWS region where the cluster is deployed"
+  value       = "us-east-1"
 }

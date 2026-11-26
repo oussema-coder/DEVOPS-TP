@@ -19,9 +19,19 @@ spec:
             - name: MYSQL_ROOT_PASSWORD
               value: "root"
             - name: MYSQL_DATABASE
-              value: "achat"
+              value: "tpFoyer17"
+            - name: MYSQL_USER
+              value: "foyer_user"
+            - name: MYSQL_PASSWORD
+              value: "root"
           ports:
             - containerPort: 3306
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 12
 ---
 apiVersion: v1
 kind: Service
@@ -50,17 +60,31 @@ spec:
     spec:
       containers:
         - name: achat-app
-          image: loo9a/achat:1.0-SNAPSHOT
+          image: hamdiarij/devops-tp:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 8089
+            - containerPort: 8082
           env:
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:mysql://mysql:3306/achat?createDatabaseIfNotExist=true&useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC"
+              value: "jdbc:mysql://mysql:3306/tpFoyer17?createDatabaseIfNotExist=true&useUnicode=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC"
             - name: SPRING_DATASOURCE_USERNAME
-              value: "root"
+              value: "foyer_user"
             - name: SPRING_DATASOURCE_PASSWORD
               value: "root"
+          readinessProbe:
+            httpGet:
+              path: /tpFoyer17/actuator/health
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /tpFoyer17/actuator/health
+              port: 8082
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
@@ -72,4 +96,4 @@ spec:
     app: achat-app
   ports:
     - port: 80
-      targetPort: 8089
+      targetPort: 8082
