@@ -1,11 +1,12 @@
-
 pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'hamdiarij/devops-tp'
+        DOCKER_IMAGE       = 'hamdiarij/devops-tp'
         AWS_DEFAULT_REGION = 'us-east-1'
-        TERRAFORM_DIR = 'terraform'
+        TERRAFORM_DIR      = 'terraform'
+        // Nom unique au monde : minuscules, chiffres et tirets uniquement
+        TF_STATE_BUCKET    = 'achat-tfstate-ahmed-2026'
     }
 
     stages {
@@ -152,10 +153,8 @@ pipeline {
         }
 
         // ==========================================
-        // 8. DOCKER PUSH (DISABLED)
+        // 8. DOCKER PUSH
         // ==========================================
-
-       
         stage('Docker Push') {
             steps {
                 withCredentials([
@@ -183,10 +182,9 @@ pipeline {
                 }
             }
         }
-        
 
         // ==========================================
-        // 9. SETUP TERRAFORM
+        // 9. SETUP TERRAFORM (backend S3 + import auto)
         // ==========================================
         stage('SETUP TERRAFORM') {
             steps {
@@ -199,14 +197,11 @@ pipeline {
                         sh '''
                             set -e
 
-                            echo "Initializing Terraform..."
-                            terraform init
+                            echo "Creating Terraform state bucket if needed..."
+                            bash ./setup-backend.sh
 
-                            echo "Validating Terraform..."
-                            terraform validate
-
-                            echo "Applying Terraform..."
-                            terraform apply -auto-approve
+                            echo "Running Terraform (init, validate, import, apply)..."
+                            bash ./deploy.sh
                         '''
                     }
                 }
@@ -257,7 +252,7 @@ pipeline {
 
                         kubectl rollout restart deployment/achat-app
 
-                        kubectl rollout status deployment/achat-app --timeout=180s
+                        kubectl rollout status deployment/achat-app --timeout=300s
 
                         echo "Kubernetes Pods:"
                         kubectl get pods
@@ -287,16 +282,13 @@ pipeline {
             SonarQube Analysis       : SUCCESS
             Nexus Deployment         : SUCCESS
             Docker Build             : SUCCESS
-            Terraform Init           : SUCCESS
-            Terraform Validate       : SUCCESS
-            Terraform Apply          : SUCCESS
+            Docker Push              : SUCCESS
+            Terraform (S3 backend)   : SUCCESS
             AWS EKS Configuration    : SUCCESS
             Kubernetes Deployment    : SUCCESS
 
-            Docker Push              : DISABLED
-
             ==========================================
-            ALL ENABLED STAGES COMPLETED!
+            ALL STAGES COMPLETED!
             ==========================================
             '''
         }
