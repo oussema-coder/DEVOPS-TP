@@ -87,14 +87,21 @@ pipeline {
         }
 
         stage('Docker Build') {
-            steps {
-                sh '''
-                    docker build -f dockerfile.jenkins \
-                        -t $DOCKER_IMAGE:$BUILD_NUMBER .
-                    docker tag $DOCKER_IMAGE:$BUILD_NUMBER $DOCKER_IMAGE:latest
-                '''
-            }
-        }
+    steps {
+        sh '''
+            set -e
+
+            echo "Building Spring Boot application image..."
+
+            docker build -f docker.jenkins \
+                -t $DOCKER_IMAGE:$BUILD_NUMBER .
+
+            docker tag \
+                $DOCKER_IMAGE:$BUILD_NUMBER \
+                $DOCKER_IMAGE:latest
+        '''
+    }
+}
 
         stage('Docker Push') {
             steps {
