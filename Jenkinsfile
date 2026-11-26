@@ -5,22 +5,35 @@ pipeline {
     environment {
         DOCKER_IMAGE = 'hamdiarij/devops-tp'
         AWS_DEFAULT_REGION = 'us-west-2'
+        TERRAFORM_DIR = 'terraform'
     }
 
     stages {
 
+        // ==========================================
+        // 1. CHECKOUT
+        // ==========================================
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
+        // ==========================================
+        // 2. BUILD AND TEST
+        // ==========================================
         stage('Build and Test') {
             steps {
-                sh 'mvn -B clean verify -s settings.xml'
+                sh '''
+                    set -e
+                    mvn -B clean verify -s settings.xml
+                '''
             }
         }
 
+        // ==========================================
+        // 3. JACOCO COVERAGE
+        // ==========================================
         stage('JaCoCo Coverage') {
             steps {
                 script {
@@ -41,6 +54,9 @@ pipeline {
             }
         }
 
+        // ==========================================
+        // 4. JACOCO REPORT
+        // ==========================================
         stage('JaCoCo Report') {
             steps {
                 jacoco(
@@ -51,6 +67,9 @@ pipeline {
             }
         }
 
+        // ==========================================
+        // 5. SONARQUBE ANALYSIS
+        // ==========================================
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
@@ -62,17 +81,20 @@ pipeline {
                     ]) {
                         sh '''
                             mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.5.0.6356:sonar \
-                            -Dsonar.projectKey=DEVOPS-TP \
-                            -Dsonar.projectName=DEVOPS-TP \
-                            -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
-                            -Dsonar.token=$SONAR_TOKEN \
-                            -s settings.xml
+                                -Dsonar.projectKey=DEVOPS-TP \
+                                -Dsonar.projectName=DEVOPS-TP \
+                                -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
+                                -Dsonar.token="$SONAR_TOKEN" \
+                                -s settings.xml
                         '''
                     }
                 }
             }
         }
 
+        // ==========================================
+        // 6. DEPLOY TO NEXUS
+        // ==========================================
         stage('Deploy to Nexus') {
             steps {
                 withCredentials([
@@ -82,11 +104,16 @@ pipeline {
                         passwordVariable: 'NEXUS_PASSWORD'
                     )
                 ]) {
-                    sh 'mvn -B deploy -s settings.xml'
+                    sh '''
+                        mvn -B deploy -s settings.xml
+                    '''
                 }
             }
         }
 
+        // ==========================================
+        // 7. DOCKER BUILD
+        // ==========================================
         stage('Docker Build') {
             steps {
                 sh '''
@@ -95,19 +122,24 @@ pipeline {
                     echo "Checking application JAR..."
                     ls -lh target/*.jar
 
-                    echo "Building Spring Boot application image..."
+                    echo "Building Docker image..."
 
-                    docker build -f ./Dockerfile.jenkins \
-                        -t $DOCKER_IMAGE:$BUILD_NUMBER .
+                    docker build \
+                        -f ./Dockerfile.jenkins \
+                        -t "$DOCKER_IMAGE:$BUILD_NUMBER" .
 
-                    docker tag $DOCKER_IMAGE:$BUILD_NUMBER \
-                        $DOCKER_IMAGE:latest
+                    docker tag \
+                        "$DOCKER_IMAGE:$BUILD_NUMBER" \
+                        "$DOCKER_IMAGE:latest"
 
                     echo "Docker image built successfully."
                 '''
             }
         }
 
+        // ==========================================
+        // 8. DOCKER PUSH
+        // ==========================================
         stage('Docker Push') {
             steps {
                 withCredentials([
@@ -118,13 +150,15 @@ pipeline {
                     )
                 ]) {
                     sh '''
+                        set +x
                         set -e
 
                         echo "$DOCKER_PASSWORD" | docker login \
-                            -u "$DOCKER_USERNAME" --password-stdin
+                            -u "$DOCKER_USERNAME" \
+                            --password-stdin
 
-                        docker push $DOCKER_IMAGE:$BUILD_NUMBER
-                        docker push $DOCKER_IMAGE:latest
+                        docker push "$DOCKER_IMAGE:$BUILD_NUMBER"
+                        docker push "$DOCKER_IMAGE:latest"
 
                         docker logout
                     '''
@@ -132,6 +166,9 @@ pipeline {
             }
         }
 
+        // ==========================================
+        // 9. TEST AWS CONNECTION
+        // ==========================================
         stage('Test AWS Connection') {
             steps {
                 echo '========== AWS CONNECTION TEST =========='
@@ -152,6 +189,7 @@ pipeline {
                 ]) {
                     sh '''
                         set +x
+                        set -e
 
                         echo "[1] Checking AWS CLI..."
 
@@ -164,20 +202,9 @@ pipeline {
 
                         echo "[2] Checking credentials..."
 
-                        test -n "$AWS_ACCESS_KEY_ID" || {
-                            echo "ERROR: Access key is empty!"
-                            exit 1
-                        }
-
-                        test -n "$AWS_SECRET_ACCESS_KEY" || {
-                            echo "ERROR: Secret key is empty!"
-                            exit 1
-                        }
-
-                        test -n "$AWS_SESSION_TOKEN" || {
-                            echo "ERROR: Session token is empty!"
-                            exit 1
-                        }
+                        test -n "$AWS_ACCESS_KEY_ID"
+                        test -n "$AWS_SECRET_ACCESS_KEY"
+                        test -n "$AWS_SESSION_TOKEN"
 
                         echo "Jenkins credentials loaded successfully."
 
@@ -191,39 +218,139 @@ pipeline {
             }
         }
 
-stage('Test Kubernetes Connection') {
-    steps {
-        withCredentials([
-            file(credentialsId: 'kubeid', variable: 'KUBECONFIG'),
-            string(credentialsId: 'aws_access_key_id',
-                   variable: 'AWS_ACCESS_KEY_ID'),
-            string(credentialsId: 'aws_secret_access_key',
-                   variable: 'AWS_SECRET_ACCESS_KEY'),
-            string(credentialsId: 'aws_session_token',
-                   variable: 'AWS_SESSION_TOKEN')
-        ]) {
-            sh '''
-                set +x
+        // ==========================================
+        // 10. TERRAFORM INITIALIZATION
+        // ==========================================
+        stage('Terraform Init') {
+            steps {
+                dir("${TERRAFORM_DIR}") {
+                    sh '''
+                        set -e
 
-                export AWS_DEFAULT_REGION=us-east-1
+                        echo "Initializing Terraform..."
 
-                echo "Testing Kubernetes connection..."
+                        terraform init
 
-                kubectl --kubeconfig="$KUBECONFIG" get nodes
-            '''
+                        echo "Terraform initialization completed."
+                    '''
+                }
+            }
+        }
+
+        // ==========================================
+        // 11. TERRAFORM VALIDATION
+        // ==========================================
+        stage('Terraform Validate') {
+            steps {
+                dir("${TERRAFORM_DIR}") {
+                    sh '''
+                        set -e
+
+                        echo "Validating Terraform configuration..."
+
+                        terraform validate
+
+                        echo "Terraform validation successful."
+                    '''
+                }
+            }
+        }
+
+        // ==========================================
+        // 12. TERRAFORM PLAN
+        // ==========================================
+        stage('Terraform Plan') {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: 'aws_access_key_id',
+                        variable: 'AWS_ACCESS_KEY_ID'
+                    ),
+                    string(
+                        credentialsId: 'aws_secret_access_key',
+                        variable: 'AWS_SECRET_ACCESS_KEY'
+                    ),
+                    string(
+                        credentialsId: 'aws_session_token',
+                        variable: 'AWS_SESSION_TOKEN'
+                    )
+                ]) {
+                    dir("${TERRAFORM_DIR}") {
+                        sh '''
+                            set +x
+                            set -e
+
+                            echo "Creating Terraform execution plan..."
+
+                            terraform plan -out=tfplan
+
+                            echo "Terraform plan created successfully."
+                        '''
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // 13. TERRAFORM APPLY
+        // ==========================================
+        stage('Terraform Apply') {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: 'aws_access_key_id',
+                        variable: 'AWS_ACCESS_KEY_ID'
+                    ),
+                    string(
+                        credentialsId: 'aws_secret_access_key',
+                        variable: 'AWS_SECRET_ACCESS_KEY'
+                    ),
+                    string(
+                        credentialsId: 'aws_session_token',
+                        variable: 'AWS_SESSION_TOKEN'
+                    )
+                ]) {
+                    dir("${TERRAFORM_DIR}") {
+                        sh '''
+                            set +x
+                            set -e
+
+                            echo "Applying Terraform configuration..."
+
+                            terraform apply -auto-approve tfplan
+
+                            echo "Terraform deployment completed successfully."
+                        '''
+                    }
+                }
+            }
         }
     }
-}
-    }
 
+    // ==========================================
+    // POST ACTIONS
+    // ==========================================
     post {
+
         success {
-            echo 'CI/CD Pipeline completed successfully!'
-            echo 'Build, Tests, JaCoCo, SonarQube, Nexus, Docker, AWS and EKS checks passed!'
+            echo '''
+            ==========================================
+            CI/CD PIPELINE COMPLETED SUCCESSFULLY!
+            ==========================================
+            Build and Tests       : SUCCESS
+            JaCoCo Coverage       : SUCCESS
+            SonarQube             : SUCCESS
+            Nexus Deployment      : SUCCESS
+            Docker Build          : SUCCESS
+            Docker Push           : SUCCESS
+            AWS Connection        : SUCCESS
+            Terraform Deployment  : SUCCESS
+            ==========================================
+            '''
         }
 
         failure {
-            echo 'Pipeline failed. Check Console Output.'
+            echo 'Pipeline failed. Check Jenkins Console Output.'
         }
 
         always {
