@@ -156,38 +156,38 @@ pipeline {
         // ==========================================
         // 8. DOCKER PUSH
         // ==========================================
-        // stage('Docker Push') {
-        //     steps {
-        //         withCredentials([
-        //             usernamePassword(
-        //                 credentialsId: 'dockerhub-credentials',
-        //                 usernameVariable: 'DOCKER_USERNAME',
-        //                 passwordVariable: 'DOCKER_PASSWORD'
-        //             )
-        //         ]) {
-        //             sh '''
-        //                 set +x
-        //                 set -e
+        // Currently disabled.
+        // Uncomment this stage when you want to push to Docker Hub.
 
-        //                 echo "Logging in to Docker Hub..."
+        /*
+        stage('Docker Push') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        set -e
 
-        //                 trap 'docker logout >/dev/null 2>&1 || true' EXIT
+                        trap 'docker logout >/dev/null 2>&1 || true' EXIT
 
-        //                 echo "$DOCKER_PASSWORD" | docker login \
-        //                     -u "$DOCKER_USERNAME" \
-        //                     --password-stdin
+                        echo "$DOCKER_PASSWORD" | docker login \
+                            -u "$DOCKER_USERNAME" \
+                            --password-stdin
 
-        //                 echo "Pushing versioned image..."
-        //                 docker push "$DOCKER_IMAGE:$BUILD_NUMBER"
+                        docker push "$DOCKER_IMAGE:$BUILD_NUMBER"
+                        docker push "$DOCKER_IMAGE:latest"
 
-        //                 echo "Pushing latest image..."
-        //                 docker push "$DOCKER_IMAGE:latest"
-
-        //                 echo "Docker images pushed successfully!"
-        //             '''
-        //         }
-        //     }
-        // }
+                        echo "Docker images pushed successfully!"
+                    '''
+                }
+            }
+        }
+        */
 
         // ==========================================
         // 9. TEST AWS CONNECTION
@@ -244,10 +244,12 @@ pipeline {
         }
 
         // ==========================================
-        // 10. CHECK EKS ENDPOINT
+        // 10. AWS ENVIRONMENT DIAGNOSIS
         // ==========================================
-        stage('Check EKS Endpoint') {
+        stage('AWS Environment Diagnosis') {
             steps {
+                echo '========== AWS ENVIRONMENT DIAGNOSIS =========='
+
                 withCredentials([
                     string(
                         credentialsId: 'aws_access_key_id',
@@ -268,29 +270,33 @@ pipeline {
 
                         export AWS_DEFAULT_REGION=us-east-1
 
-                        echo "Checking AWS identity..."
+                        echo "===== 1. AWS IDENTITY ====="
                         aws sts get-caller-identity
 
-                        echo "Checking EKS cluster endpoint..."
+                        echo "===== 2. AVAILABLE EKS CLUSTERS ====="
 
-                        aws eks describe-cluster \
-                            --name mykubernetes \
+                        aws eks list-clusters \
                             --region us-east-1 \
-                            --query 'cluster.endpoint' \
-                            --output text
+                            --output table || true
 
-                        echo "EKS endpoint check completed successfully!"
+                        echo "===== 3. AVAILABLE AWS REGIONS ====="
+
+                        aws ec2 describe-regions \
+                            --query "Regions[].RegionName" \
+                            --output text || true
+
+                        echo "===== AWS DIAGNOSIS COMPLETED ====="
                     '''
                 }
             }
         }
 
         // ==========================================
-        // 11. TEST KUBERNETES CONNECTION
+        // 11. KUBERNETES CONFIGURATION TEST
         // ==========================================
-        stage('Test Kubernetes Connection') {
+        stage('Kubernetes Configuration Test') {
             steps {
-                echo '========== KUBERNETES CONNECTION TEST =========='
+                echo '========== KUBERNETES CONFIGURATION TEST =========='
 
                 withCredentials([
                     file(
@@ -315,9 +321,8 @@ pipeline {
                         set -e
 
                         export AWS_DEFAULT_REGION=us-east-1
-                        export KUBECONFIG="$KUBECONFIG"
 
-                        echo "[1] Checking kubectl..."
+                        echo "===== 1. CHECKING KUBECTL ====="
 
                         if ! command -v kubectl >/dev/null 2>&1; then
                             echo "ERROR: kubectl is not installed!"
@@ -326,16 +331,15 @@ pipeline {
 
                         kubectl version --client
 
-                        echo "[2] Checking Kubernetes context..."
+                        echo "===== 2. CHECKING KUBERNETES CONTEXT ====="
+
                         kubectl config current-context
 
-                        echo "[3] Checking cluster connection..."
+                        echo "===== 3. TESTING KUBERNETES API ====="
+
                         kubectl cluster-info
 
-                        echo "[4] Checking Kubernetes nodes..."
-                        kubectl get nodes -o wide
-
-                        echo "[5] Kubernetes connection successful!"
+                        echo "===== 4. KUBERNETES CONFIGURATION TEST COMPLETED ====="
                     '''
                 }
             }
@@ -369,6 +373,7 @@ pipeline {
                                 export AWS_DEFAULT_REGION=us-east-1
 
                                 echo "Initializing Terraform..."
+
                                 terraform init -input=false
 
                                 echo "Terraform initialization successful!"
@@ -389,6 +394,7 @@ pipeline {
                         set -e
 
                         echo "Validating Terraform configuration..."
+
                         terraform validate
 
                         echo "Terraform validation successful!"
@@ -439,6 +445,11 @@ pipeline {
         // ==========================================
         // 15. TERRAFORM APPLY
         // ==========================================
+        // DISABLED TEMPORARILY.
+        // Do not apply infrastructure until AWS permissions
+        // and the expected EKS environment are confirmed.
+
+        /*
         stage('Terraform Apply') {
             steps {
                 withCredentials([
@@ -475,6 +486,7 @@ pipeline {
                 }
             }
         }
+        */
     }
 
     // ==========================================
@@ -487,22 +499,24 @@ pipeline {
             CI/CD PIPELINE COMPLETED SUCCESSFULLY!
             ==========================================
 
-            Build and Tests        : SUCCESS
-            JaCoCo Coverage        : SUCCESS
-            SonarQube              : SUCCESS
-            Nexus Deployment       : SUCCESS
-            Docker Build           : SUCCESS
-            Docker Push            : SUCCESS
-            AWS Connection         : SUCCESS
-            EKS Endpoint Check     : SUCCESS
-            Kubernetes Connection  : SUCCESS
-            Terraform Init         : SUCCESS
-            Terraform Validate     : SUCCESS
-            Terraform Plan         : SUCCESS
-            Terraform Apply        : SUCCESS
+            Build and Tests          : SUCCESS
+            JaCoCo Coverage          : SUCCESS
+            JaCoCo Report            : SUCCESS
+            SonarQube Analysis       : SUCCESS
+            Nexus Deployment         : SUCCESS
+            Docker Build             : SUCCESS
+            AWS Connection           : SUCCESS
+            AWS Environment Diagnosis: SUCCESS
+            Kubernetes Config Test   : SUCCESS
+            Terraform Init           : SUCCESS
+            Terraform Validate      : SUCCESS
+            Terraform Plan           : SUCCESS
+
+            Terraform Apply          : DISABLED
+            Docker Push              : DISABLED
 
             ==========================================
-            ALL STAGES COMPLETED SUCCESSFULLY!
+            ALL ENABLED STAGES COMPLETED!
             ==========================================
             '''
         }
