@@ -87,21 +87,20 @@ pipeline {
         }
 
         stage('Docker Build') {
-    steps {
-        sh '''
-            set -e
+            steps {
+                sh '''
+                    set -e
 
-            echo "Building Spring Boot application image..."
+                    echo "Building Spring Boot application image..."
 
-            docker build -f dockerfile.jenkins \
-                -t $DOCKER_IMAGE:$BUILD_NUMBER .
+                    docker build -f dockerfile.jenkins \
+                        -t $DOCKER_IMAGE:$BUILD_NUMBER .
 
-            docker tag $DOCKER_IMAGE:$BUILD_NUMBER \
-                $DOCKER_IMAGE:latest
-        '''
-    }
-}
-}
+                    docker tag $DOCKER_IMAGE:$BUILD_NUMBER \
+                        $DOCKER_IMAGE:latest
+                '''
+            }
+        }
 
         stage('Docker Push') {
             steps {
@@ -126,38 +125,36 @@ pipeline {
                 }
             }
         }
-        
-stage('Test AWS Connection') {
-    steps {
-        withCredentials([
-            string(
-                credentialsId: 'aws-access-key-id',
-                variable: 'AWS_ACCESS_KEY_ID'
-            ),
-            string(
-                credentialsId: 'aws-secret-access-key',
-                variable: 'AWS_SECRET_ACCESS_KEY'
-            ),
-            string(
-                credentialsId: 'aws-session-token',
-                variable: 'AWS_SESSION_TOKEN'
-            )
-        ]) {
-            sh '''
-                set +x
 
-                export AWS_DEFAULT_REGION=us-west-2
+        stage('Test AWS Connection') {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: 'aws-access-key-id',
+                        variable: 'AWS_ACCESS_KEY_ID'
+                    ),
+                    string(
+                        credentialsId: 'aws-secret-access-key',
+                        variable: 'AWS_SECRET_ACCESS_KEY'
+                    ),
+                    string(
+                        credentialsId: 'aws-session-token',
+                        variable: 'AWS_SESSION_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        export AWS_DEFAULT_REGION=us-west-2
 
-                echo "Checking AWS CLI..."
-                aws --version
+                        echo "Checking AWS CLI..."
+                        aws --version
 
-                echo "Testing AWS authentication..."
-                aws sts get-caller-identity
-            '''
+                        echo "Testing AWS authentication..."
+                        aws sts get-caller-identity
+                    '''
+                }
+            }
         }
-    }
-}
-
     }
 
     post {
