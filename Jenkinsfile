@@ -4,7 +4,7 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'hamdiarij/devops-tp'
-        AWS_DEFAULT_REGION = 'us-west-2'
+        AWS_DEFAULT_REGION = 'us-east-1'
         TERRAFORM_DIR = 'terraform'
     }
 
@@ -26,11 +26,8 @@ pipeline {
             steps {
                 sh '''
                     set -e
-
                     echo "Building and testing application..."
-
                     mvn -B clean verify -s settings.xml
-
                     echo "Build and tests completed successfully!"
                 '''
             }
@@ -139,7 +136,6 @@ pipeline {
                     set -e
 
                     echo "Checking application JAR..."
-
                     ls -lh target/*.jar
 
                     echo "Building Docker image..."
@@ -160,40 +156,38 @@ pipeline {
         // ==========================================
         // 8. DOCKER PUSH
         // ==========================================
-        stage('Docker Push') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
-                        usernameVariable: 'DOCKER_USERNAME',
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )
-                ]) {
-                    sh '''
-                        set +x
-                        set -e
+        // stage('Docker Push') {
+        //     steps {
+        //         withCredentials([
+        //             usernamePassword(
+        //                 credentialsId: 'dockerhub-credentials',
+        //                 usernameVariable: 'DOCKER_USERNAME',
+        //                 passwordVariable: 'DOCKER_PASSWORD'
+        //             )
+        //         ]) {
+        //             sh '''
+        //                 set +x
+        //                 set -e
 
-                        echo "Logging in to Docker Hub..."
+        //                 echo "Logging in to Docker Hub..."
 
-                        trap 'docker logout >/dev/null 2>&1 || true' EXIT
+        //                 trap 'docker logout >/dev/null 2>&1 || true' EXIT
 
-                        echo "$DOCKER_PASSWORD" | docker login \
-                            -u "$DOCKER_USERNAME" \
-                            --password-stdin
+        //                 echo "$DOCKER_PASSWORD" | docker login \
+        //                     -u "$DOCKER_USERNAME" \
+        //                     --password-stdin
 
-                        echo "Pushing versioned image..."
+        //                 echo "Pushing versioned image..."
+        //                 docker push "$DOCKER_IMAGE:$BUILD_NUMBER"
 
-                        docker push "$DOCKER_IMAGE:$BUILD_NUMBER"
+        //                 echo "Pushing latest image..."
+        //                 docker push "$DOCKER_IMAGE:latest"
 
-                        echo "Pushing latest image..."
-
-                        docker push "$DOCKER_IMAGE:latest"
-
-                        echo "Docker images pushed successfully!"
-                    '''
-                }
-            }
-        }
+        //                 echo "Docker images pushed successfully!"
+        //             '''
+        //         }
+        //     }
+        // }
 
         // ==========================================
         // 9. TEST AWS CONNECTION
@@ -219,6 +213,8 @@ pipeline {
                     sh '''
                         set +x
                         set -e
+
+                        export AWS_DEFAULT_REGION=us-east-1
 
                         echo "[1] Checking AWS CLI..."
 
@@ -273,16 +269,17 @@ pipeline {
                         export AWS_DEFAULT_REGION=us-east-1
 
                         echo "Checking AWS identity..."
-
                         aws sts get-caller-identity
 
-                        echo "Checking EKS cluster..."
+                        echo "Checking EKS cluster endpoint..."
 
                         aws eks describe-cluster \
                             --name mykubernetes \
                             --region us-east-1 \
                             --query 'cluster.endpoint' \
                             --output text
+
+                        echo "EKS endpoint check completed successfully!"
                     '''
                 }
             }
@@ -317,6 +314,9 @@ pipeline {
                         set +x
                         set -e
 
+                        export AWS_DEFAULT_REGION=us-east-1
+                        export KUBECONFIG="$KUBECONFIG"
+
                         echo "[1] Checking kubectl..."
 
                         if ! command -v kubectl >/dev/null 2>&1; then
@@ -327,15 +327,12 @@ pipeline {
                         kubectl version --client
 
                         echo "[2] Checking Kubernetes context..."
-
                         kubectl config current-context
 
                         echo "[3] Checking cluster connection..."
-
                         kubectl cluster-info
 
                         echo "[4] Checking Kubernetes nodes..."
-
                         kubectl get nodes -o wide
 
                         echo "[5] Kubernetes connection successful!"
@@ -363,14 +360,15 @@ pipeline {
                         variable: 'AWS_SESSION_TOKEN'
                     )
                 ]) {
-                    dir('terraform') {
+                    dir("${TERRAFORM_DIR}") {
                         retry(3) {
                             sh '''
                                 set +x
                                 set -e
 
-                                echo "Initializing Terraform..."
+                                export AWS_DEFAULT_REGION=us-east-1
 
+                                echo "Initializing Terraform..."
                                 terraform init -input=false
 
                                 echo "Terraform initialization successful!"
@@ -391,7 +389,6 @@ pipeline {
                         set -e
 
                         echo "Validating Terraform configuration..."
-
                         terraform validate
 
                         echo "Terraform validation successful!"
@@ -423,6 +420,8 @@ pipeline {
                         sh '''
                             set +x
                             set -e
+
+                            export AWS_DEFAULT_REGION=us-east-1
 
                             echo "Creating Terraform execution plan..."
 
@@ -461,6 +460,8 @@ pipeline {
                             set +x
                             set -e
 
+                            export AWS_DEFAULT_REGION=us-east-1
+
                             echo "Applying Terraform configuration..."
 
                             terraform apply \
@@ -480,7 +481,6 @@ pipeline {
     // POST ACTIONS
     // ==========================================
     post {
-
         success {
             echo '''
             ==========================================
