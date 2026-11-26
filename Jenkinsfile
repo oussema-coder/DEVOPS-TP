@@ -187,25 +187,8 @@ pipeline {
         }
 
         // ==========================================
-        // 8b. BUILD FRONTEND (Angular 16)
-        // ==========================================
-        stage('Build Frontend') {
-            steps {
-                dir("${FRONTEND_DIR}") {
-                    sh '''
-                        set -e
-                        echo "Installing frontend dependencies..."
-                        npm ci --legacy-peer-deps
-                        echo "Building Angular production bundle..."
-                        npm run build:prod
-                        echo "Frontend build completed!"
-                    '''
-                }
-            }
-        }
-
-        // ==========================================
         // 8c. DOCKER BUILD FRONTEND
+        // (npm ci + ng build run INSIDE the multi-stage Dockerfile)
         // ==========================================
         stage('Docker Build Frontend') {
             steps {
@@ -362,7 +345,7 @@ pipeline {
             Nexus Deployment         : SUCCESS
             Docker Build (Backend)   : SUCCESS
             Docker Push (Backend)    : SUCCESS
-            Build Frontend (Angular) : SUCCESS
+
             Docker Build Frontend    : SUCCESS
             Terraform Init           : SUCCESS
             Terraform Validate       : SUCCESS
