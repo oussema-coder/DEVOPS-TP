@@ -26,7 +26,12 @@ pipeline {
             steps {
                 sh '''
                     set -e
+
+                    echo "Building and testing application..."
+
                     mvn -B clean verify -s settings.xml
+
+                    echo "Build and tests completed successfully!"
                 '''
             }
         }
@@ -80,12 +85,19 @@ pipeline {
                         )
                     ]) {
                         sh '''
+                            set +x
+                            set -e
+
+                            echo "Starting SonarQube analysis..."
+
                             mvn -B org.sonarsource.scanner.maven:sonar-maven-plugin:5.5.0.6356:sonar \
                                 -Dsonar.projectKey=DEVOPS-TP \
                                 -Dsonar.projectName=DEVOPS-TP \
                                 -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco/jacoco.xml \
                                 -Dsonar.token="$SONAR_TOKEN" \
                                 -s settings.xml
+
+                            echo "SonarQube analysis completed!"
                         '''
                     }
                 }
@@ -105,7 +117,14 @@ pipeline {
                     )
                 ]) {
                     sh '''
+                        set +x
+                        set -e
+
+                        echo "Deploying artifact to Nexus..."
+
                         mvn -B deploy -s settings.xml
+
+                        echo "Nexus deployment completed!"
                     '''
                 }
             }
@@ -120,6 +139,7 @@ pipeline {
                     set -e
 
                     echo "Checking application JAR..."
+
                     ls -lh target/*.jar
 
                     echo "Building Docker image..."
@@ -132,7 +152,7 @@ pipeline {
                         "$DOCKER_IMAGE:$BUILD_NUMBER" \
                         "$DOCKER_IMAGE:latest"
 
-                    echo "Docker image built successfully."
+                    echo "Docker image built successfully!"
                 '''
             }
         }
@@ -140,31 +160,40 @@ pipeline {
         // ==========================================
         // 8. DOCKER PUSH
         // ==========================================
-        // stage('Docker Push') {
-        //     steps {
-        //         withCredentials([
-        //             usernamePassword(
-        //                 credentialsId: 'dockerhub-credentials',
-        //                 usernameVariable: 'DOCKER_USERNAME',
-        //                 passwordVariable: 'DOCKER_PASSWORD'
-        //             )
-        //         ]) {
-        //             sh '''
-        //                 set +x
-        //                 set -e
+        stage('Docker Push') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        set -e
 
-        //                 echo "$DOCKER_PASSWORD" | docker login \
-        //                     -u "$DOCKER_USERNAME" \
-        //                     --password-stdin
+                        echo "Logging in to Docker Hub..."
 
-        //                 docker push "$DOCKER_IMAGE:$BUILD_NUMBER"
-        //                 docker push "$DOCKER_IMAGE:latest"
+                        trap 'docker logout >/dev/null 2>&1 || true' EXIT
 
-        //                 docker logout
-        //             '''
-        //         }
-        //     }
-        // }
+                        echo "$DOCKER_PASSWORD" | docker login \
+                            -u "$DOCKER_USERNAME" \
+                            --password-stdin
+
+                        echo "Pushing versioned image..."
+
+                        docker push "$DOCKER_IMAGE:$BUILD_NUMBER"
+
+                        echo "Pushing latest image..."
+
+                        docker push "$DOCKER_IMAGE:latest"
+
+                        echo "Docker images pushed successfully!"
+                    '''
+                }
+            }
+        }
 
         // ==========================================
         // 9. TEST AWS CONNECTION
@@ -200,13 +229,13 @@ pipeline {
 
                         aws --version
 
-                        echo "[2] Checking credentials..."
+                        echo "[2] Checking AWS credentials..."
 
                         test -n "$AWS_ACCESS_KEY_ID"
                         test -n "$AWS_SECRET_ACCESS_KEY"
                         test -n "$AWS_SESSION_TOKEN"
 
-                        echo "Jenkins credentials loaded successfully."
+                        echo "AWS credentials loaded successfully!"
 
                         echo "[3] Testing AWS authentication..."
 
@@ -223,17 +252,33 @@ pipeline {
         // ==========================================
         stage('Terraform Init') {
             steps {
-                dir('terraform') {
-                    retry(3) {
-                        sh '''
-                            set -e
+                withCredentials([
+                    string(
+                        credentialsId: 'aws_access_key_id',
+                        variable: 'AWS_ACCESS_KEY_ID'
+                    ),
+                    string(
+                        credentialsId: 'aws_secret_access_key',
+                        variable: 'AWS_SECRET_ACCESS_KEY'
+                    ),
+                    string(
+                        credentialsId: 'aws_session_token',
+                        variable: 'AWS_SESSION_TOKEN'
+                    )
+                ]) {
+                    dir('terraform') {
+                        retry(3) {
+                            sh '''
+                                set +x
+                                set -e
 
-                            echo "Initializing Terraform..."
+                                echo "Initializing Terraform..."
 
-                            terraform init -input=false
+                                terraform init -input=false
 
-                            echo "Terraform initialization successful!"
-                        '''
+                                echo "Terraform initialization successful!"
+                            '''
+                        }
                     }
                 }
             }
@@ -252,7 +297,7 @@ pipeline {
 
                         terraform validate
 
-                        echo "Terraform validation successful."
+                        echo "Terraform validation successful!"
                     '''
                 }
             }
@@ -284,9 +329,11 @@ pipeline {
 
                             echo "Creating Terraform execution plan..."
 
-                            terraform plan -input=false -out=tfplan
+                            terraform plan \
+                                -input=false \
+                                -out=tfplan
 
-                            echo "Terraform plan created successfully."
+                            echo "Terraform plan created successfully!"
                         '''
                     }
                 }
@@ -319,11 +366,72 @@ pipeline {
 
                             echo "Applying Terraform configuration..."
 
-                            terraform apply -input=false -auto-approve tfplan
+                            terraform apply \
+                                -input=false \
+                                -auto-approve \
+                                tfplan
 
-                            echo "Terraform deployment completed successfully."
+                            echo "Terraform deployment completed successfully!"
                         '''
                     }
+                }
+            }
+        }
+
+        // ==========================================
+        // 14. TEST KUBERNETES CONNECTION
+        // ==========================================
+        stage('Test Kubernetes Connection') {
+            steps {
+                echo '========== KUBERNETES CONNECTION TEST =========='
+
+                withCredentials([
+                    file(
+                        credentialsId: 'kubeid',
+                        variable: 'KUBECONFIG'
+                    ),
+                    string(
+                        credentialsId: 'aws_access_key_id',
+                        variable: 'AWS_ACCESS_KEY_ID'
+                    ),
+                    string(
+                        credentialsId: 'aws_secret_access_key',
+                        variable: 'AWS_SECRET_ACCESS_KEY'
+                    ),
+                    string(
+                        credentialsId: 'aws_session_token',
+                        variable: 'AWS_SESSION_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set +x
+                        set -e
+
+                        export KUBECONFIG="$KUBECONFIG"
+
+                        echo "[1] Checking kubectl..."
+
+                        if ! command -v kubectl >/dev/null 2>&1; then
+                            echo "ERROR: kubectl is not installed!"
+                            exit 1
+                        fi
+
+                        kubectl version --client
+
+                        echo "[2] Checking Kubernetes context..."
+
+                        kubectl config current-context
+
+                        echo "[3] Checking cluster connection..."
+
+                        kubectl cluster-info
+
+                        echo "[4] Checking Kubernetes nodes..."
+
+                        kubectl get nodes -o wide
+
+                        echo "[5] Kubernetes connection successful!"
+                    '''
                 }
             }
         }
@@ -339,6 +447,7 @@ pipeline {
             ==========================================
             CI/CD PIPELINE COMPLETED SUCCESSFULLY!
             ==========================================
+
             Build and Tests       : SUCCESS
             JaCoCo Coverage       : SUCCESS
             SonarQube             : SUCCESS
@@ -350,12 +459,21 @@ pipeline {
             Terraform Validate    : SUCCESS
             Terraform Plan        : SUCCESS
             Terraform Apply       : SUCCESS
+            Kubernetes Connection: SUCCESS
+
+            ==========================================
+            ALL STAGES COMPLETED SUCCESSFULLY!
             ==========================================
             '''
         }
 
         failure {
-            echo 'Pipeline failed. Check Jenkins Console Output.'
+            echo '''
+            ==========================================
+            PIPELINE FAILED!
+            ==========================================
+            Check Jenkins Console Output for details.
+            '''
         }
 
         always {
