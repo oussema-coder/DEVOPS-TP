@@ -7,7 +7,7 @@ WORKDIR /app
 
 # Copy dependency manifests first (leverages Docker layer caching)
 COPY package*.json ./
-RUN npm ci --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 # Copy the rest of the source code
 COPY . .
