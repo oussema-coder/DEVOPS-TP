@@ -155,7 +155,7 @@ pipeline {
         // 8. DOCKER PUSH (DISABLED)
         // ==========================================
 
-        /*
+       
         stage('Docker Push') {
             steps {
                 withCredentials([
@@ -183,7 +183,7 @@ pipeline {
                 }
             }
         }
-        */
+        
 
         // ==========================================
         // 9. SETUP TERRAFORM
