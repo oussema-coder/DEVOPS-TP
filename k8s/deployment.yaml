@@ -58,6 +58,20 @@ spec:
       labels:
         app: achat-app
     spec:
+      # Wait for MySQL to be fully ready before starting the app
+      initContainers:
+        - name: wait-for-mysql
+          image: mysql:8.0
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for MySQL to be ready..."
+              until mysqladmin ping -h mysql -uroot -proot --silent; do
+                echo "MySQL not ready yet, retrying in 5s..."
+                sleep 5
+              done
+              echo "MySQL is ready!"
       containers:
         - name: achat-app
           image: hamdiarij/devops-tp:latest
@@ -75,14 +89,14 @@ spec:
             httpGet:
               path: /tpFoyer17/actuator/health
               port: 8082
-            initialDelaySeconds: 30
+            initialDelaySeconds: 60
             periodSeconds: 10
-            failureThreshold: 6
+            failureThreshold: 10
           livenessProbe:
             httpGet:
               path: /tpFoyer17/actuator/health
               port: 8082
-            initialDelaySeconds: 60
+            initialDelaySeconds: 90
             periodSeconds: 15
             failureThreshold: 3
 ---
