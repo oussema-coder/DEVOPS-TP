@@ -1,56 +1,61 @@
-
-module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.0"
-
-  cluster_name    = var.cluster_name
-  cluster_version = var.kubernetes_version
-
-  cluster_endpoint_public_access = true
-
-  vpc_id = module.vpc.vpc_id
-
-  subnet_ids = module.vpc.private_subnets
-
-  enable_cluster_creator_admin_permissions = true
-
-  eks_managed_node_groups = {
-    general = {
-      name           = "general-workers"
-      instance_types = [var.node_instance_type]
-
-      min_size     = var.min_capacity
-      max_size     = var.max_capacity
-      desired_size = var.desired_capacity
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
     }
   }
 }
 
-module "vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 5.0"
+provider "aws" {
+  region = "us-east-1"
+}
 
-  name = "${var.cluster_name}-vpc"
-  cidr = "10.0.0.0/16"
+# Use AWS Academy's pre-existing LabRole
+data "aws_iam_role" "lab_role" {
+  name = "LabRole"
+}
 
-  azs             = ["us-west-2a", "us-west-2b"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+# Use the Default VPC and its subnets (excluding us-east-1e, which EKS does not support)
+data "aws_vpc" "default" {
+  default = true
+}
 
-  enable_nat_gateway   = true
-  single_nat_gateway   = true
-  enable_dns_hostnames = true
+data "aws_subnets" "eks_subnets" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+  filter {
+    name   = "availability-zone"
+    values = ["us-east-1a", "us-east-1b", "us-east-1c", "us-east-1d", "us-east-1f"]
+  }
+}
 
-  public_subnet_tags = {
-    "kubernetes.io/role/elb" = "1"
+# 1. Create the EKS Cluster
+resource "aws_eks_cluster" "achat_cluster" {
+  name     = "achat-cluster"
+  role_arn = data.aws_iam_role.lab_role.arn
+
+  vpc_config {
+    subnet_ids = data.aws_subnets.eks_subnets.ids
+  }
+}
+
+# 2. Create the Worker Nodes
+resource "aws_eks_node_group" "achat_nodes" {
+  cluster_name    = aws_eks_cluster.achat_cluster.name
+  node_group_name = "achat-nodes"
+  node_role_arn   = data.aws_iam_role.lab_role.arn
+  subnet_ids      = data.aws_subnets.eks_subnets.ids
+
+  scaling_config {
+    desired_size = 2
+    max_size     = 2
+    min_size     = 1
   }
 
-  private_subnet_tags = {
-    "kubernetes.io/role/internal-elb" = "1"
-  }
+  instance_types = ["t3.medium"]
 
-  tags = {
-    Environment = "DevOps-TP"
-    Terraform   = "true"
-  }
+  depends_on = [aws_eks_cluster.achat_cluster]
 }

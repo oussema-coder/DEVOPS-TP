@@ -118,9 +118,7 @@ pipeline {
                         set -e
 
                         echo "Deploying artifact to Nexus..."
-
                         mvn -B deploy -s settings.xml
-
                         echo "Nexus deployment completed!"
                     '''
                 }
@@ -154,10 +152,8 @@ pipeline {
         }
 
         // ==========================================
-        // 8. DOCKER PUSH
+        // 8. DOCKER PUSH (DISABLED)
         // ==========================================
-        // Currently disabled.
-        // Uncomment this stage when you want to push to Docker Hub.
 
         /*
         stage('Docker Push') {
@@ -190,252 +186,27 @@ pipeline {
         */
 
         // ==========================================
-        // 9. TEST AWS CONNECTION
+        // 9. SETUP TERRAFORM
         // ==========================================
-        stage('Test AWS Connection') {
-            steps {
-                echo '========== AWS CONNECTION TEST =========='
-
-                withCredentials([
-                    string(
-                        credentialsId: 'aws_access_key_id',
-                        variable: 'AWS_ACCESS_KEY_ID'
-                    ),
-                    string(
-                        credentialsId: 'aws_secret_access_key',
-                        variable: 'AWS_SECRET_ACCESS_KEY'
-                    ),
-                    string(
-                        credentialsId: 'aws_session_token',
-                        variable: 'AWS_SESSION_TOKEN'
-                    )
-                ]) {
-                    sh '''
-                        set +x
-                        set -e
-
-                        export AWS_DEFAULT_REGION=us-east-1
-
-                        echo "[1] Checking AWS CLI..."
-
-                        if ! command -v aws >/dev/null 2>&1; then
-                            echo "ERROR: AWS CLI is not installed!"
-                            exit 1
-                        fi
-
-                        aws --version
-
-                        echo "[2] Checking AWS credentials..."
-
-                        test -n "$AWS_ACCESS_KEY_ID"
-                        test -n "$AWS_SECRET_ACCESS_KEY"
-                        test -n "$AWS_SESSION_TOKEN"
-
-                        echo "AWS credentials loaded successfully!"
-
-                        echo "[3] Testing AWS authentication..."
-
-                        aws sts get-caller-identity
-
-                        echo "[4] AWS connection successful!"
-                    '''
-                }
-            }
-        }
-
-        // ==========================================
-        // 10. AWS ENVIRONMENT DIAGNOSIS
-        // ==========================================
-        stage('AWS Environment Diagnosis') {
-            steps {
-                echo '========== AWS ENVIRONMENT DIAGNOSIS =========='
-
-                withCredentials([
-                    string(
-                        credentialsId: 'aws_access_key_id',
-                        variable: 'AWS_ACCESS_KEY_ID'
-                    ),
-                    string(
-                        credentialsId: 'aws_secret_access_key',
-                        variable: 'AWS_SECRET_ACCESS_KEY'
-                    ),
-                    string(
-                        credentialsId: 'aws_session_token',
-                        variable: 'AWS_SESSION_TOKEN'
-                    )
-                ]) {
-                    sh '''
-                        set +x
-                        set -e
-
-                        export AWS_DEFAULT_REGION=us-east-1
-
-                        echo "===== 1. AWS IDENTITY ====="
-                        aws sts get-caller-identity
-
-                        echo "===== 2. AVAILABLE EKS CLUSTERS ====="
-
-                        aws eks list-clusters \
-                            --region us-east-1 \
-                            --output table || true
-
-                        echo "===== 3. AVAILABLE AWS REGIONS ====="
-
-                        aws ec2 describe-regions \
-                            --query "Regions[].RegionName" \
-                            --output text || true
-
-                        echo "===== AWS DIAGNOSIS COMPLETED ====="
-                    '''
-                }
-            }
-        }
-
-        // ==========================================
-        // 11. KUBERNETES CONFIGURATION TEST
-        // ==========================================
-        stage('Kubernetes Configuration Test') {
-            steps {
-                echo '========== KUBERNETES CONFIGURATION TEST =========='
-
-                withCredentials([
-                    file(
-                        credentialsId: 'kubeid',
-                        variable: 'KUBECONFIG'
-                    ),
-                    string(
-                        credentialsId: 'aws_access_key_id',
-                        variable: 'AWS_ACCESS_KEY_ID'
-                    ),
-                    string(
-                        credentialsId: 'aws_secret_access_key',
-                        variable: 'AWS_SECRET_ACCESS_KEY'
-                    ),
-                    string(
-                        credentialsId: 'aws_session_token',
-                        variable: 'AWS_SESSION_TOKEN'
-                    )
-                ]) {
-                    sh '''
-                        set +x
-                        set -e
-
-                        export AWS_DEFAULT_REGION=us-east-1
-
-                        echo "===== 1. CHECKING KUBECTL ====="
-
-                        if ! command -v kubectl >/dev/null 2>&1; then
-                            echo "ERROR: kubectl is not installed!"
-                            exit 1
-                        fi
-
-                        kubectl version --client
-
-                        echo "===== 2. CHECKING KUBERNETES CONTEXT ====="
-
-                        kubectl config current-context
-
-                        echo "===== 3. TESTING KUBERNETES API ====="
-
-                        kubectl cluster-info
-
-                        echo "===== 4. KUBERNETES CONFIGURATION TEST COMPLETED ====="
-                    '''
-                }
-            }
-        }
-
-        // ==========================================
-        // 12. TERRAFORM INIT
-        // ==========================================
-        stage('Terraform Init') {
+        stage('SETUP TERRAFORM') {
             steps {
                 withCredentials([
-                    string(
-                        credentialsId: 'aws_access_key_id',
-                        variable: 'AWS_ACCESS_KEY_ID'
-                    ),
-                    string(
-                        credentialsId: 'aws_secret_access_key',
-                        variable: 'AWS_SECRET_ACCESS_KEY'
-                    ),
-                    string(
-                        credentialsId: 'aws_session_token',
-                        variable: 'AWS_SESSION_TOKEN'
-                    )
-                ]) {
-                    dir("${TERRAFORM_DIR}") {
-                        retry(3) {
-                            sh '''
-                                set +x
-                                set -e
-
-                                export AWS_DEFAULT_REGION=us-east-1
-
-                                echo "Initializing Terraform..."
-
-                                terraform init -input=false
-
-                                echo "Terraform initialization successful!"
-                            '''
-                        }
-                    }
-                }
-            }
-        }
-
-        // ==========================================
-        // 13. TERRAFORM VALIDATE
-        // ==========================================
-        stage('Terraform Validate') {
-            steps {
-                dir("${TERRAFORM_DIR}") {
-                    sh '''
-                        set -e
-
-                        echo "Validating Terraform configuration..."
-
-                        terraform validate
-
-                        echo "Terraform validation successful!"
-                    '''
-                }
-            }
-        }
-
-        // ==========================================
-        // 14. TERRAFORM PLAN
-        // ==========================================
-        stage('Terraform Plan') {
-            steps {
-                withCredentials([
-                    string(
-                        credentialsId: 'aws_access_key_id',
-                        variable: 'AWS_ACCESS_KEY_ID'
-                    ),
-                    string(
-                        credentialsId: 'aws_secret_access_key',
-                        variable: 'AWS_SECRET_ACCESS_KEY'
-                    ),
-                    string(
-                        credentialsId: 'aws_session_token',
-                        variable: 'AWS_SESSION_TOKEN'
-                    )
+                    string(credentialsId: 'aws_access_key_id', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'aws-session-token', variable: 'AWS_SESSION_TOKEN')
                 ]) {
                     dir("${TERRAFORM_DIR}") {
                         sh '''
-                            set +x
                             set -e
 
-                            export AWS_DEFAULT_REGION=us-east-1
+                            echo "Initializing Terraform..."
+                            terraform init
 
-                            echo "Creating Terraform execution plan..."
+                            echo "Validating Terraform..."
+                            terraform validate
 
-                            terraform plan \
-                                -input=false \
-                                -out=tfplan
-
-                            echo "Terraform plan created successfully!"
+                            echo "Applying Terraform..."
+                            terraform apply -auto-approve
                         '''
                     }
                 }
@@ -443,56 +214,67 @@ pipeline {
         }
 
         // ==========================================
-        // 15. TERRAFORM APPLY
+        // 10. UPDATE KUBECONFIG
         // ==========================================
-        // DISABLED TEMPORARILY.
-        // Do not apply infrastructure until AWS permissions
-        // and the expected EKS environment are confirmed.
-
-        /*
-        stage('Terraform Apply') {
+        stage('UPDATE KUBECONFIG') {
             steps {
                 withCredentials([
-                    string(
-                        credentialsId: 'aws_access_key_id',
-                        variable: 'AWS_ACCESS_KEY_ID'
-                    ),
-                    string(
-                        credentialsId: 'aws_secret_access_key',
-                        variable: 'AWS_SECRET_ACCESS_KEY'
-                    ),
-                    string(
-                        credentialsId: 'aws_session_token',
-                        variable: 'AWS_SESSION_TOKEN'
-                    )
+                    string(credentialsId: 'aws_access_key_id', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'aws-session-token', variable: 'AWS_SESSION_TOKEN')
                 ]) {
-                    dir("${TERRAFORM_DIR}") {
-                        sh '''
-                            set +x
-                            set -e
+                    sh '''
+                        set -e
 
-                            export AWS_DEFAULT_REGION=us-east-1
+                        echo "Updating Kubernetes configuration..."
 
-                            echo "Applying Terraform configuration..."
+                        aws eks update-kubeconfig \
+                            --region "$AWS_DEFAULT_REGION" \
+                            --name achat-cluster
 
-                            terraform apply \
-                                -input=false \
-                                -auto-approve \
-                                tfplan
-
-                            echo "Terraform deployment completed successfully!"
-                        '''
-                    }
+                        echo "Kubeconfig updated successfully!"
+                    '''
                 }
             }
         }
-        */
+
+        // ==========================================
+        // 11. DEPLOY TO AWS KUBERNETES
+        // ==========================================
+        stage('DEPLOY TO AWS KUBERNETES') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'aws_access_key_id', variable: 'AWS_ACCESS_KEY_ID'),
+                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
+                    string(credentialsId: 'aws-session-token', variable: 'AWS_SESSION_TOKEN')
+                ]) {
+                    sh '''
+                        set -e
+
+                        echo "Deploying application to Kubernetes..."
+
+                        kubectl apply -f k8s/deployment.yaml
+
+                        kubectl rollout restart deployment/achat-app
+
+                        kubectl rollout status deployment/achat-app --timeout=180s
+
+                        echo "Kubernetes Pods:"
+                        kubectl get pods
+
+                        echo "Kubernetes Service:"
+                        kubectl get svc achat-service
+                    '''
+                }
+            }
+        }
     }
 
     // ==========================================
     // POST ACTIONS
     // ==========================================
     post {
+
         success {
             echo '''
             ==========================================
@@ -505,14 +287,12 @@ pipeline {
             SonarQube Analysis       : SUCCESS
             Nexus Deployment         : SUCCESS
             Docker Build             : SUCCESS
-            AWS Connection           : SUCCESS
-            AWS Environment Diagnosis: SUCCESS
-            Kubernetes Config Test   : SUCCESS
             Terraform Init           : SUCCESS
-            Terraform Validate      : SUCCESS
-            Terraform Plan           : SUCCESS
+            Terraform Validate       : SUCCESS
+            Terraform Apply          : SUCCESS
+            AWS EKS Configuration    : SUCCESS
+            Kubernetes Deployment    : SUCCESS
 
-            Terraform Apply          : DISABLED
             Docker Push              : DISABLED
 
             ==========================================
