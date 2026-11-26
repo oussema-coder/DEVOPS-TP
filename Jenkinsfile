@@ -140,31 +140,31 @@ pipeline {
         // ==========================================
         // 8. DOCKER PUSH
         // ==========================================
-        stage('Docker Push') {
-            steps {
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'dockerhub-credentials',
-                        usernameVariable: 'DOCKER_USERNAME',
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )
-                ]) {
-                    sh '''
-                        set +x
-                        set -e
+        // stage('Docker Push') {
+        //     steps {
+        //         withCredentials([
+        //             usernamePassword(
+        //                 credentialsId: 'dockerhub-credentials',
+        //                 usernameVariable: 'DOCKER_USERNAME',
+        //                 passwordVariable: 'DOCKER_PASSWORD'
+        //             )
+        //         ]) {
+        //             sh '''
+        //                 set +x
+        //                 set -e
 
-                        echo "$DOCKER_PASSWORD" | docker login \
-                            -u "$DOCKER_USERNAME" \
-                            --password-stdin
+        //                 echo "$DOCKER_PASSWORD" | docker login \
+        //                     -u "$DOCKER_USERNAME" \
+        //                     --password-stdin
 
-                        docker push "$DOCKER_IMAGE:$BUILD_NUMBER"
-                        docker push "$DOCKER_IMAGE:latest"
+        //                 docker push "$DOCKER_IMAGE:$BUILD_NUMBER"
+        //                 docker push "$DOCKER_IMAGE:latest"
 
-                        docker logout
-                    '''
-                }
-            }
-        }
+        //                 docker logout
+        //             '''
+        //         }
+        //     }
+        // }
 
         // ==========================================
         // 9. TEST AWS CONNECTION
