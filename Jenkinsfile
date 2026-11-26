@@ -191,33 +191,29 @@ pipeline {
             }
         }
 
-        stage('Check EKS Cluster') {
-            steps {
-                withCredentials([
-                    string(
-                        credentialsId: 'aws_access_key_id',
-                        variable: 'AWS_ACCESS_KEY_ID'
-                    ),
-                    string(
-                        credentialsId: 'aws_secret_access_key',
-                        variable: 'AWS_SECRET_ACCESS_KEY'
-                    ),
-                    string(
-                        credentialsId: 'aws_session_token',
-                        variable: 'AWS_SESSION_TOKEN'
-                    )
-                ]) {
-                    sh '''
-                        set +x
+stage('Test Kubernetes Connection') {
+    steps {
+        withCredentials([
+            file(credentialsId: 'kubeid', variable: 'KUBECONFIG'),
+            string(credentialsId: 'aws_access_key_id',
+                   variable: 'AWS_ACCESS_KEY_ID'),
+            string(credentialsId: 'aws_secret_access_key',
+                   variable: 'AWS_SECRET_ACCESS_KEY'),
+            string(credentialsId: 'aws_session_token',
+                   variable: 'AWS_SESSION_TOKEN')
+        ]) {
+            sh '''
+                set +x
 
-                        echo "Checking AWS EKS clusters..."
+                export AWS_DEFAULT_REGION=us-east-1
 
-                        aws eks list-clusters \
-                            --region "$AWS_DEFAULT_REGION"
-                    '''
-                }
-            }
+                echo "Testing Kubernetes connection..."
+
+                kubectl --kubeconfig="$KUBECONFIG" get nodes
+            '''
         }
+    }
+}
     }
 
     post {
