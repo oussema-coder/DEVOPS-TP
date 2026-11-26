@@ -219,26 +219,28 @@ pipeline {
         }
 
         // ==========================================
-        // 10. TERRAFORM INITIALIZATION
+        // 10. TERRAFORM INIT
         // ==========================================
         stage('Terraform Init') {
             steps {
-                dir("${TERRAFORM_DIR}") {
-                    sh '''
-                        set -e
+                dir('terraform') {
+                    retry(3) {
+                        sh '''
+                            set -e
 
-                        echo "Initializing Terraform..."
+                            echo "Initializing Terraform..."
 
-                        terraform init
+                            terraform init -input=false
 
-                        echo "Terraform initialization completed."
-                    '''
+                            echo "Terraform initialization successful!"
+                        '''
+                    }
                 }
             }
         }
 
         // ==========================================
-        // 11. TERRAFORM VALIDATION
+        // 11. TERRAFORM VALIDATE
         // ==========================================
         stage('Terraform Validate') {
             steps {
@@ -282,7 +284,7 @@ pipeline {
 
                             echo "Creating Terraform execution plan..."
 
-                            terraform plan -out=tfplan
+                            terraform plan -input=false -out=tfplan
 
                             echo "Terraform plan created successfully."
                         '''
@@ -317,7 +319,7 @@ pipeline {
 
                             echo "Applying Terraform configuration..."
 
-                            terraform apply -auto-approve tfplan
+                            terraform apply -input=false -auto-approve tfplan
 
                             echo "Terraform deployment completed successfully."
                         '''
@@ -344,7 +346,10 @@ pipeline {
             Docker Build          : SUCCESS
             Docker Push           : SUCCESS
             AWS Connection        : SUCCESS
-            Terraform Deployment  : SUCCESS
+            Terraform Init        : SUCCESS
+            Terraform Validate    : SUCCESS
+            Terraform Plan        : SUCCESS
+            Terraform Apply       : SUCCESS
             ==========================================
             '''
         }
