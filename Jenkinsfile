@@ -86,35 +86,66 @@ pipeline {
             }
         }
 
-       
-stage('Docker Build') {
-    steps {
-        sh '''
-            docker build -t $DOCKER_IMAGE:$BUILD_NUMBER .
-            docker tag $DOCKER_IMAGE:$BUILD_NUMBER $DOCKER_IMAGE:latest
-        '''
-    }
-}
+        stage('Docker Build') {
+            steps {
+                sh '''
+                    docker build -f dockerfile.jenkins \
+                        -t $DOCKER_IMAGE:$BUILD_NUMBER .
+                    docker tag $DOCKER_IMAGE:$BUILD_NUMBER $DOCKER_IMAGE:latest
+                '''
+            }
+        }
 
-stage('Docker Push') {
+        stage('Docker Push') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+                    sh '''
+                        set -e
+
+                        echo "$DOCKER_PASSWORD" | docker login \
+                            -u "$DOCKER_USERNAME" --password-stdin
+
+                        docker push $DOCKER_IMAGE:$BUILD_NUMBER
+                        docker push $DOCKER_IMAGE:latest
+
+                        docker logout
+                    '''
+                }
+            }
+        }
+        
+stage('Test AWS Connection') {
     steps {
         withCredentials([
-            usernamePassword(
-                credentialsId: 'dockerhub-credentials',
-                usernameVariable: 'DOCKER_USERNAME',
-                passwordVariable: 'DOCKER_PASSWORD'
+            string(
+                credentialsId: 'aws-access-key-id',
+                variable: 'AWS_ACCESS_KEY_ID'
+            ),
+            string(
+                credentialsId: 'aws-secret-access-key',
+                variable: 'AWS_SECRET_ACCESS_KEY'
+            ),
+            string(
+                credentialsId: 'aws-session-token',
+                variable: 'AWS_SESSION_TOKEN'
             )
         ]) {
             sh '''
-                set -e
+                set +x
 
-                echo "$DOCKER_PASSWORD" | docker login \
-                    -u "$DOCKER_USERNAME" --password-stdin
+                export AWS_DEFAULT_REGION=us-west-2
 
-                docker push $DOCKER_IMAGE:$BUILD_NUMBER
-                docker push $DOCKER_IMAGE:latest
+                echo "Checking AWS CLI..."
+                aws --version
 
-                docker logout
+                echo "Testing AWS authentication..."
+                aws sts get-caller-identity
             '''
         }
     }

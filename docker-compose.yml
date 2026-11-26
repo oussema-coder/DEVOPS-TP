@@ -1,3 +1,4 @@
+
 services:
   sonar-db:
     image: postgres:15-alpine
@@ -36,6 +37,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
+
   mysql:
     image: mysql:8.0
     container_name: devops-mysql
@@ -77,7 +79,6 @@ services:
       retries: 5
       start_period: 60s
 
-  
   prometheus:
     image: prom/prometheus:latest
     container_name: devops-prometheus
@@ -126,7 +127,6 @@ services:
     networks:
       - devops-network
 
-
   jenkins:
     build:
       context: .
@@ -152,7 +152,6 @@ services:
       nexus:
         condition: service_started
 
-
 networks:
   devops-network:
 
@@ -160,10 +159,9 @@ volumes:
   jenkins_home:
   mysql_data:
   nexus-data:
-  sonar_db_data:    
-  sonarqube_data:    
-  sonarqube_extensions: 
-  sonarqube_logs:    
+  sonar_db_data:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
   prometheus_data:
   grafana_data:
-
