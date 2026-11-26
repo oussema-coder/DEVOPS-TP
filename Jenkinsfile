@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -91,13 +90,18 @@ pipeline {
                 sh '''
                     set -e
 
+                    echo "Checking application JAR..."
+                    ls -lh target/*.jar
+
                     echo "Building Spring Boot application image..."
 
-                    docker build -f dockerfile.jenkins \
+                    docker build -f ./Dockerfile.jenkins \
                         -t $DOCKER_IMAGE:$BUILD_NUMBER .
 
                     docker tag $DOCKER_IMAGE:$BUILD_NUMBER \
                         $DOCKER_IMAGE:latest
+
+                    echo "Docker image built successfully."
                 '''
             }
         }
@@ -144,6 +148,7 @@ pipeline {
                 ]) {
                     sh '''
                         set +x
+
                         export AWS_DEFAULT_REGION=us-west-2
 
                         echo "Checking AWS CLI..."
@@ -160,7 +165,7 @@ pipeline {
     post {
         success {
             echo 'CI/CD Pipeline completed successfully!'
-            echo 'Build, Tests, JaCoCo, SonarQube, Nexus and Docker passed!'
+            echo 'Build, Tests, JaCoCo, SonarQube, Nexus, Docker and AWS passed!'
         }
 
         failure {
