@@ -1,3 +1,12 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+type: Opaque
+stringData:
+  MYSQL_ROOT_PASSWORD: "root"
+  MYSQL_PASSWORD: "root"
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,21 +26,36 @@ spec:
           image: mysql:8.0
           env:
             - name: MYSQL_ROOT_PASSWORD
-              value: "root"
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_ROOT_PASSWORD
             - name: MYSQL_DATABASE
               value: "tpFoyer17"
             - name: MYSQL_USER
               value: "foyer_user"
             - name: MYSQL_PASSWORD
-              value: "root"
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_PASSWORD
           ports:
             - containerPort: 3306
           readinessProbe:
             exec:
-              command: ["mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+              command:
+                - sh
+                - -c
+                - mysqladmin ping -h localhost -uroot -p"$MYSQL_ROOT_PASSWORD"
             initialDelaySeconds: 20
             periodSeconds: 10
             failureThreshold: 12
+          volumeMounts:
+            - name: mysql-data
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-data
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -70,7 +94,10 @@ spec:
             - name: SPRING_DATASOURCE_USERNAME
               value: "foyer_user"
             - name: SPRING_DATASOURCE_PASSWORD
-              value: "root"
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_PASSWORD
           readinessProbe:
             httpGet:
               path: /tpFoyer17/actuator/health

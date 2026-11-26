@@ -1,9 +1,17 @@
 terraform {
+  required_version = ">= 1.5.0"
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+  }
+
+  # Le nom du bucket est passé à terraform init (-backend-config)
+  backend "s3" {
+    key    = "achat/terraform.tfstate"
+    region = "us-east-1"
   }
 }
 
@@ -11,16 +19,16 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# Use AWS Academy's pre-existing LabRole
+# AWS Academy : rôle pré-existant
 data "aws_iam_role" "lab_role" {
   name = "LabRole"
 }
 
-# Use the Default VPC and its subnets (excluding us-east-1e, which EKS does not support)
 data "aws_vpc" "default" {
   default = true
 }
 
+# On exclut us-east-1e (non supportée par EKS)
 data "aws_subnets" "eks_subnets" {
   filter {
     name   = "vpc-id"
@@ -32,7 +40,7 @@ data "aws_subnets" "eks_subnets" {
   }
 }
 
-# 1. Create the EKS Cluster
+# 1. Cluster EKS
 resource "aws_eks_cluster" "achat_cluster" {
   name     = "achat-cluster"
   role_arn = data.aws_iam_role.lab_role.arn
@@ -42,7 +50,7 @@ resource "aws_eks_cluster" "achat_cluster" {
   }
 }
 
-# 2. Create the Worker Nodes
+# 2. Nœuds
 resource "aws_eks_node_group" "achat_nodes" {
   cluster_name    = aws_eks_cluster.achat_cluster.name
   node_group_name = "achat-nodes"
@@ -61,18 +69,18 @@ resource "aws_eks_node_group" "achat_nodes" {
   depends_on = [aws_eks_cluster.achat_cluster]
 }
 
-# 3. Outputs — required for `aws eks update-kubeconfig` in Jenkins
+# 3. Outputs
 output "cluster_name" {
-  description = "EKS Cluster name (used in Jenkinsfile update-kubeconfig step)"
+  description = "Nom du cluster EKS (utilisé par update-kubeconfig)"
   value       = aws_eks_cluster.achat_cluster.name
 }
 
 output "cluster_endpoint" {
-  description = "EKS Cluster API server endpoint"
+  description = "Endpoint de l'API server EKS"
   value       = aws_eks_cluster.achat_cluster.endpoint
 }
 
 output "cluster_region" {
-  description = "AWS region where the cluster is deployed"
+  description = "Région AWS"
   value       = "us-east-1"
 }
