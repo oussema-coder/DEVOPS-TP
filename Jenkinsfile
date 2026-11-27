@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -154,10 +153,8 @@ pipeline {
         }
 
         // ==========================================
-        // 8. DOCKER PUSH (DISABLED)
+        // 8. DOCKER PUSH
         // ==========================================
-
-       
         stage('Docker Push') {
             steps {
                 withCredentials([
@@ -310,7 +307,33 @@ pipeline {
 
                         # Rollout backend
                         kubectl rollout restart deployment/achat-app
-                        kubectl rollout status deployment/achat-app --timeout=380s
+
+                        if ! kubectl rollout status deployment/achat-app --timeout=380s; then
+                            echo "===== NODES ====="
+                            kubectl get nodes -o wide || true
+
+                            echo "===== PODS ====="
+                            kubectl get pods -o wide || true
+
+                            echo "===== DESCRIBE ====="
+                            kubectl describe pod -l app=achat-app || true
+
+                            for p in $(kubectl get pods -l app=achat-app -o name); do
+                                echo "===== LOGS $p ====="
+                                kubectl logs "$p" --all-containers --tail=100 || true
+
+                                echo "===== PREVIOUS LOGS $p ====="
+                                kubectl logs "$p" -c achat-app --previous --tail=100 || true
+                            done
+
+                            echo "===== MYSQL LOGS ====="
+                            kubectl logs deployment/mysql --tail=50 || true
+
+                            echo "===== EVENTS ====="
+                            kubectl get events --sort-by=.lastTimestamp || true
+
+                            exit 1
+                        fi
 
                         # Rollout frontend
                         kubectl rollout restart deployment/foyer-frontend
