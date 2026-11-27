@@ -234,7 +234,7 @@ pipeline {
         }
 
         // ==========================================
-        // 11. DEPLOY TO AWS KUBERNETES
+        // 11. DEPLOY TO AWS KUBERNETES (avec diagnostic auto)
         // ==========================================
         stage('DEPLOY TO AWS KUBERNETES') {
             steps {
@@ -250,9 +250,36 @@ pipeline {
 
                         kubectl apply -f k8s/deployment.yaml
 
+                        echo "Waiting for MySQL..."
+                        kubectl rollout status deployment/mysql --timeout=300s
+
                         kubectl rollout restart deployment/achat-app
 
-                        kubectl rollout status deployment/achat-app --timeout=300s
+                        if ! kubectl rollout status deployment/achat-app --timeout=300s; then
+                            echo "=========================================="
+                            echo "ROLLOUT FAILED - DIAGNOSTIC"
+                            echo "=========================================="
+
+                            echo "--- PODS ---"
+                            kubectl get pods -o wide || true
+
+                            echo "--- DESCRIBE achat-app ---"
+                            kubectl describe pod -l app=achat-app || true
+
+                            echo "--- LOGS achat-app (current) ---"
+                            kubectl logs -l app=achat-app --tail=100 --prefix || true
+
+                            echo "--- LOGS achat-app (previous) ---"
+                            kubectl logs -l app=achat-app --previous --tail=100 --prefix || true
+
+                            echo "--- LOGS mysql ---"
+                            kubectl logs -l app=mysql --tail=50 --prefix || true
+
+                            echo "--- EVENTS ---"
+                            kubectl get events --sort-by=.lastTimestamp | tail -30 || true
+
+                            exit 1
+                        fi
 
                         echo "Kubernetes Pods:"
                         kubectl get pods
