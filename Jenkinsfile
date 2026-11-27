@@ -310,11 +310,11 @@ pipeline {
 
                         # Rollout backend
                         kubectl rollout restart deployment/achat-app
-                        kubectl rollout status deployment/achat-app --timeout=180s
+                        kubectl rollout status deployment/achat-app --timeout=380s
 
                         # Rollout frontend
                         kubectl rollout restart deployment/foyer-frontend
-                        kubectl rollout status deployment/foyer-frontend --timeout=180s
+                        kubectl rollout status deployment/foyer-frontend --timeout=380s
 
                         echo "Kubernetes Pods:"
                         kubectl get pods
